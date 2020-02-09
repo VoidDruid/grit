@@ -1,7 +1,8 @@
 resolver: lts-14.8
 
 packages:
-- .
+  - .
 
-# extra-deps:
-# -
+extra-deps:
+  - llvm-hs-9.0.1
+  - llvm-hs-pure-9.0.0

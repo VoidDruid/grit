@@ -1,5 +1,7 @@
 # User
 .idea/
+.vscode/
+notes/
 
 # Created by .ignore support plugin (hsz.mobi)
 ### Haskell template

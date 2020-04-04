@@ -2,6 +2,9 @@
 .idea/
 .vscode/
 notes/
+main.grt
+main.ir
+main.sh
 
 # Created by .ignore support plugin (hsz.mobi)
 ### Haskell template

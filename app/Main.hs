@@ -1,36 +1,35 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Codegen
-import JIT
+import Data.Either
+import qualified Data.Text.Lazy.IO as TLIO
+
+import System.IO
+import System.Environment
+import System.Console.Haskeline
+
 import qualified LLVM.AST as AST
 import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Float as F
+import LLVM.Pretty (ppllvm)
 
-{-
+import JIT
+import qualified Builder as B 
+import qualified Parser as P
 
-; ModuleID = 'my cool jit'
+processFile fname = do
+  code <- readFile fname
+  let parseResult = P.parseTopLevel code
+  let buildResult = case parseResult of
+        Left err -> "Error"
+        Right result -> ppllvm $ B.buildAST result
+  putStrLn "TOKENS \n"
+  print parseResult
+  putStrLn "\nLLVM IR \n"
+  TLIO.putStrLn buildResult
 
-define double @main() {
-entry:
-  %1 = fadd double 1.000000e+01, 2.000000e+01
-  ret double %1
-}
-
--}
-
-initModule :: AST.Module
-initModule = emptyModule "my cool jit"
-
-logic :: LLVM ()
-logic = do
-  define double "main" [] $ \ptrToMain -> do
-    let a = cons $ C.Float (F.Double 10)
-    let b = cons $ C.Float (F.Double 20)
-    res <- fadd a b
-    ret res
-
-main :: IO AST.Module
+main :: IO ()
 main = do
-  let ast = runLLVM initModule logic
-  rc <- runJIT ast
-  return ast
+  args <- getArgs
+  case args of
+    []      -> putStrLn "Provide file name!"
+    [fname] -> processFile fname >> return ()

@@ -20,16 +20,6 @@ import LLVM.IRBuilder.Instruction
 import StringUtils
 import qualified Syntax as S
 
-{-
-data FunctionData = FunctionData {
-    name :: String
-  , args :: [S.Def]
-  , type :: ExprType
-  }
-  deriving Show
-
-functionAST :: S.Expr -> FunctionData
--}
 integerConstant i = ConstantOperand (C.Int {C.integerBits = 32, C.integerValue = i})
 
 typeMap = Map.fromList [(S.IntType, i32)]

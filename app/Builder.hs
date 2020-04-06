@@ -43,4 +43,4 @@ functionAST (S.Function retType name args body) =
           do ret $ integerConstant 1
 
 buildAST :: [S.Expr] -> Module
-buildAST [func] = buildModule "programm" $ mdo functionAST func
+buildAST [func] = buildModule "program" $ mdo functionAST func

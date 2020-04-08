@@ -5,6 +5,7 @@ module Builder where
 
 import Control.Applicative ((<$>))
 
+import Data.Maybe
 import Data.Map ((!))
 import qualified Data.Map as Map
 
@@ -18,19 +19,24 @@ import LLVM.IRBuilder.Monad
 import LLVM.IRBuilder.Instruction
 
 import StringUtils
-import qualified Syntax as S
+import Syntax
 
 integerConstant i = ConstantOperand (C.Int {C.integerBits = 32, C.integerValue = i})
 
-typeMap = Map.fromList [(S.IntType, i32)]
+typeMap = Map.fromList [(IntType, i32)]
 
-definitionAST (S.Def defType name) = (typeMap ! defType, ParameterName $ toShort' name)
+argDef (Def defType name) = (typeMap ! defType, ParameterName $ toShort' name)
 
-functionAST (S.Function retType name args body) = 
+-- TODO: extractDefs :: Expr -> Maybe Expr
+
+funcBodyBuilder :: MonadIRBuilder m => [Expr] -> [Expr] -> ([Operand] -> m ())
+funcBodyBuilder argTokens bodyTokens = func
+  where func [] = do ret $ integerConstant 1
+
+functionAST (Syntax.Function retType name args body) = 
   function (Name $ toShort' name) arguments (typeMap ! retType) funcBody
-  where arguments = map definitionAST args
-        funcBody [] = mdo
-          do ret $ integerConstant 1
+  where arguments = map argDef args
+        funcBody = funcBodyBuilder args body
 
-buildAST :: [S.Expr] -> Module
+buildAST :: [Expr] -> Module
 buildAST [func] = buildModule "program" $ mdo functionAST func

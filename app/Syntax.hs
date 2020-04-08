@@ -1,6 +1,6 @@
 module Syntax where
 
---type Name = String
+type Name = String
 type CodeBlock = [Expr]
 
 data ExprType = IntType | FloatType
@@ -9,10 +9,10 @@ data ExprType = IntType | FloatType
 data Expr
   = Int Integer
   | Float Double
-  | Var String
-  | Def ExprType String
+  | Var Name
+  | Def ExprType Name
   | Call String [Expr]
-  | Function ExprType String [Expr{-Should be Def-}] CodeBlock
+  | Function ExprType Name [Expr] CodeBlock
   | BinaryOp String Expr Expr
   | UnaryOp String Expr
   | If Expr CodeBlock CodeBlock

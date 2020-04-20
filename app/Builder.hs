@@ -13,6 +13,7 @@ import Data.Word (Word32)
 import LLVM.AST hiding (function, alignment)
 import LLVM.AST.AddrSpace
 import LLVM.AST.Type as AST
+import qualified LLVM.AST as A
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.Constant as C
 
@@ -55,6 +56,7 @@ saveInt value = do
   store (int32 value) pointer
   return pointer
 
+refName :: String -> A.Name
 refName name = Name (toShort' $  name ++ "_0")
 
 referenceInt :: String -> Operand

@@ -35,6 +35,8 @@ iSize = 32
 alignment :: Word32
 alignment = 4
 
+integerConstant i = ConstantOperand (C.Int {C.integerBits = iSize, C.integerValue = i})
+
 integerPointer :: AST.Type
 integerPointer = AST.PointerType i32 addrSpace
 
@@ -66,19 +68,32 @@ typeMap = Map.fromList [(IntType, i32)]
 
 argDef (Def defType name) = (typeMap ! defType, ParameterName $ toShort' name)
 
--- TODO: extractDefs :: Expr -> Maybe Expr
+extractDefs :: MonadIRBuilder m => [Expr] -> m ()
+extractDefs (expr:exprs) = do
+  fromMaybe (pure ()) $ extractDef expr
+  extractDefs exprs
+extractDefs [] = pure ()
 
-funcBodyBuilder :: MonadIRBuilder m => [Expr] -> [Expr] -> ([Operand] -> m ())
-funcBodyBuilder argTokens bodyTokens = func
-  where func argOperands = do a <- named (saveInt 10) (toShort'"a")
-                              b <- named (saveInt 20) (toShort' "b")
-                              value <- add (referenceInt "a") (referenceInt "b")
-                              ret value
+extractDef :: MonadIRBuilder m => Expr -> Maybe (m ())
+extractDef (BinaryOp "=" maybeDef _) = case maybeDef of
+  Def defType defName -> Just $ do
+    allocateInt `named` toShort' defName
+    pure ()
+  _ -> Nothing
+extractDef _ = Nothing
+  
+funcBodyBuilder :: MonadIRBuilder m => [Expr] -> ([Operand] -> m ())
+funcBodyBuilder bodyTokens = func
+  where 
+    func argOperands = do
+      extractDefs bodyTokens
+      value <- add (integerConstant 1) (integerConstant 2)
+      ret value
 
 functionAST (Syntax.Function retType name args body) = 
   function (Name $ toShort' name) arguments (typeMap ! retType) funcBody
   where arguments = map argDef args
-        funcBody = funcBodyBuilder args body
+        funcBody = funcBodyBuilder body
 
 buildAST :: [Expr] -> Module
 buildAST [func] = buildModule "program" $ mdo functionAST func

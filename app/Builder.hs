@@ -10,8 +10,9 @@ import Data.Map ((!))
 import qualified Data.Map as Map
 import Data.Word (Word32)
 
-import LLVM.AST hiding (function, alignment)
+import LLVM.AST hiding (function, alignment, Call)
 import LLVM.AST.AddrSpace
+import LLVM.AST.ParameterAttribute (ParameterAttribute)
 import LLVM.AST.Type as AST
 import qualified LLVM.AST as A
 import qualified LLVM.AST.Float as F
@@ -96,21 +97,61 @@ emitAll [] = pure ()
 
 emit :: MonadIRBuilder m => Expr -> m ()
 emitInner :: MonadIRBuilder m => Expr -> m Operand
+emitArgs :: MonadIRBuilder m => [Expr] -> m [(Operand, [ParameterAttribute])]
 
--- Binary Op, UnaryOp
+extractOperand :: MonadIRBuilder m => Expr -> m Operand
+extractOperand expr = case expr of
+  Int i -> pure (int32 i)
+  Var v -> load (referenceIntPointer v)
+  _ -> emitInner expr
+
+emitArgs (expr:exprs) = do
+  arg <- emitInner expr
+  args <- emitArgs exprs
+  return ((arg, []) : args)
+emitArgs _ = return []
+
+-- UnaryOp
+emitInner (BinaryOp operator opr1 opr2) = 
+  do
+    operand1 <- extractOperand opr1
+    operand2 <- extractOperand opr2
+    operation operand1 operand2
+  where
+    operation = case operator of
+      "+" -> add
+      "-" -> sub
+      "*" -> mul
+      --"/" -> div
+
+emitInner (Call funcName exprs) =
+  do
+    args <- emitArgs exprs
+    call (referenceInt funcName) args
+  where
+    emitArg expr = do
+      op <- emitInner expr
+      return (op, []) -- TODO
+
+-- TODO: The following patterns can probably be simplified
+emitInner (Int i) = extractOperand (Int i)
+emitInner (Var v) = extractOperand (Var v)
 emitInner _ = error "Impossible inner expression (error messages are WIP)"
 
 emit (BinaryOp "=" dest object) = 
   do
-    value <- case object of
-      Int i -> pure (int32 i)
-      Var v -> load (referenceIntPointer v)
-      _ -> emitInner object 
+    value <- extractOperand object
     store (referenceIntPointer name) value
   where
     name = case dest of 
       Def _ n -> n
       Var n -> n
+
+emit (Return expr) = do
+  value <- emitInner expr
+  ret value
+
+emit (Call f e) = emitInner (Call f e) >> pure ()
 
 emit _ = pure ()
 
@@ -127,5 +168,6 @@ functionAST (Syntax.Function retType name args body) =
   where arguments = map argDef args
         funcBody = funcBodyBuilder body
 
+-- TODO: multiple functions
 buildAST :: [Expr] -> Module
 buildAST [func] = buildModule "program" $ mdo functionAST func

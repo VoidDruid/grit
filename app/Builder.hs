@@ -60,7 +60,10 @@ saveInt value = do
   return pointer
 
 refName :: String -> A.Name
-refName name = Name (toShort' $  name ++ "_0")
+refName name = Name (toShort' $ name ++ "_0")
+
+globalName :: String -> A.Name
+globalName name = Name (toShort' name)
 
 reference :: AST.Type -> String -> Operand
 reference type_ name = LocalReference type_ (refName name)
@@ -73,7 +76,9 @@ referenceIntPointer name = reference integerPointer name
 
 typeMap = Map.fromList [(IntType, i32)]
 
-argDef (Def defType name) = (typeMap ! defType, ParameterName $ toShort' name)
+argName = ("arg_" ++)
+
+argDef (Def defType name) = (typeMap ! defType, ParameterName $ toShort' (argName name))
 
 extractDefs :: MonadIRBuilder m => [Expr] -> m ()
 extractDefs (expr:exprs) = do
@@ -98,6 +103,10 @@ emitAll [] = pure ()
 emit :: MonadIRBuilder m => Expr -> m ()
 emitInner :: MonadIRBuilder m => Expr -> m Operand
 emitArgs :: MonadIRBuilder m => [Expr] -> m [(Operand, [ParameterAttribute])]
+
+makeFunRef :: String -> Operand
+makeFunRef funcName = ConstantOperand (C.GlobalReference funcType $ globalName funcName)
+  where funcType = FunctionType i32 [] False
 
 extractOperand :: MonadIRBuilder m => Expr -> m Operand
 extractOperand expr = case expr of
@@ -127,7 +136,7 @@ emitInner (BinaryOp operator opr1 opr2) =
 emitInner (Call funcName exprs) =
   do
     args <- emitArgs exprs
-    call (referenceInt funcName) args
+    call (makeFunRef funcName) args
   where
     emitArg expr = do
       op <- emitInner expr
@@ -155,10 +164,18 @@ emit (Call f e) = emitInner (Call f e) >> pure ()
 
 emit _ = pure ()
 
-funcBodyBuilder :: MonadIRBuilder m => [Expr] -> ([Operand] -> m ())
-funcBodyBuilder bodyTokens = func
+allocArgs :: MonadIRBuilder m => [Expr] -> m ()
+allocArgs (Def type_ name : exprs) = do
+  p <- allocateInt `named` toShort' name
+  store p (referenceInt $ argName name)
+  allocArgs exprs
+allocArgs [] = pure ()
+
+funcBodyBuilder :: MonadIRBuilder m => [Expr] -> [Expr] -> ([Operand] -> m ())
+funcBodyBuilder bodyTokens args = func
   where
     func argOperands = do
+      allocArgs args
       -- Steps of codegen
       extractDefs bodyTokens
       emitAll bodyTokens
@@ -166,8 +183,14 @@ funcBodyBuilder bodyTokens = func
 functionAST (Syntax.Function retType name args body) = 
   function (Name $ toShort' name) arguments (typeMap ! retType) funcBody
   where arguments = map argDef args
-        funcBody = funcBodyBuilder body
+        funcBody = funcBodyBuilder body args
 
--- TODO: multiple functions
+parseTopLevel (expr:exprs) = do
+  case expr of
+    (Syntax.Function r n a b) -> functionAST (Syntax.Function r n a b) >> pure ()
+    _ -> pure () -- TODO: return error
+  parseTopLevel exprs
+parseTopLevel [] = pure ()
+
 buildAST :: [Expr] -> Module
-buildAST [func] = buildModule "program" $ mdo functionAST func
+buildAST exprs = buildModule "program" $ parseTopLevel exprs

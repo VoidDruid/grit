@@ -175,6 +175,7 @@ funcBodyBuilder :: MonadIRBuilder m => [Expr] -> [Expr] -> ([Operand] -> m ())
 funcBodyBuilder bodyTokens args = func
   where
     func argOperands = do
+      -- Dirty hack because I'm stupid and can't be bothered to fix it
       allocArgs args
       -- Steps of codegen
       extractDefs bodyTokens

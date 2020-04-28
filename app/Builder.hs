@@ -106,8 +106,8 @@ emit :: (MonadFix m, MonadIRBuilder m) => Expr -> m ()
 emitInner :: MonadIRBuilder m => Expr -> m Operand
 emitArgs :: MonadIRBuilder m => [Expr] -> m [(Operand, [ParameterAttribute])]
 
-makeFunRef :: String -> Operand
-makeFunRef funcName = ConstantOperand (C.GlobalReference funcType $ globalName funcName)
+makeFuncRef :: String -> Operand
+makeFuncRef funcName = ConstantOperand (C.GlobalReference funcType $ globalName funcName)
   where funcType = FunctionType i32 [] False
 
 extractOperand :: MonadIRBuilder m => Expr -> m Operand
@@ -145,7 +145,7 @@ emitInner (BinaryOp operator opr1 opr2) =
 emitInner (Call funcName exprs) =
   do
     args <- emitArgs exprs
-    call (makeFunRef funcName) args
+    call (makeFuncRef funcName) args
   where
     emitArg expr = do
       op <- emitInner expr

@@ -67,13 +67,25 @@ codeBlock = braces $ many $
      reserved ";"
      return e
 
+decorator :: Parser Modifier
+decorator = do
+  char '@'
+  Decorator <$> identifier
+
+modifiers :: Parser [Modifier]
+modifiers = do
+  decs <- many decorator
+  -- TODO: in future here we can add parsing of some other modifiers
+  return decs
+
 function :: Parser Expr
 function = do
+  mods <- modifiers
   funcType <- exprType
   name <- identifier
   args <- parens $ commaSep definition
   body <- codeBlock
-  return $ Function funcType name args body
+  return $ Function mods funcType name args body
 
 returnF :: Parser Expr
 returnF = do

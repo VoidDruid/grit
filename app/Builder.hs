@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
-
+{-# LANGUAGE RecursiveDo #-}
 module Builder where
 
+import Control.Monad.Fix (MonadFix)
 import Control.Applicative ((<$>))
 
 import Data.Maybe
@@ -16,6 +17,8 @@ import LLVM.AST.Type as AST
 import qualified LLVM.AST as A
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.Constant as C
+import qualified LLVM.AST.IntegerPredicate as IPredicats
+import qualified LLVM.AST.FloatingPointPredicate as FPredicats
 
 import LLVM.IRBuilder.Module
 import LLVM.IRBuilder.Monad
@@ -93,13 +96,13 @@ extractDef (BinaryOp "=" maybeDef _) = case maybeDef of
   _ -> pure ()
 extractDef _ = pure ()
 
-emitAll :: MonadIRBuilder m => [Expr] -> m ()
+emitAll :: (MonadFix m, MonadIRBuilder m) => [Expr] -> m ()
 emitAll (expr:exprs) = do
   emit expr
   emitAll exprs
 emitAll [] = pure ()
 
-emit :: MonadIRBuilder m => Expr -> m ()
+emit :: (MonadFix m, MonadIRBuilder m) => Expr -> m ()
 emitInner :: MonadIRBuilder m => Expr -> m Operand
 emitArgs :: MonadIRBuilder m => [Expr] -> m [(Operand, [ParameterAttribute])]
 
@@ -131,6 +134,13 @@ emitInner (BinaryOp operator opr1 opr2) =
       "-" -> sub
       "*" -> mul
       --"/" -> div
+      -- TODO: support float
+      "<" -> icmp IPredicats.SLT
+      ">" -> icmp IPredicats.SGT
+      "==" -> icmp IPredicats.EQ
+      "!=" -> icmp IPredicats.NE
+      "<=" -> icmp IPredicats.SLE
+      ">=" -> icmp IPredicats.SGE
 
 emitInner (Call funcName exprs) =
   do
@@ -161,7 +171,19 @@ emit (Return expr) = do
 
 emit (Call f e) = emitInner (Call f e) >> pure ()
 
+emit (If cond blockTrue blockFalse) = mdo
+  condition <- emitInner cond
+  condBr condition trueBranch falseBranch
+  trueBranch <- buildBranch "true" blockTrue
+  falseBranch <- buildBranch "false" blockFalse
+  return ()
+
 emit _ = pure ()
+
+buildBranch name codeBlock = do
+  branch <- block `named` name
+  buildCodeBlock codeBlock
+  return branch
 
 allocArgs :: MonadIRBuilder m => [Expr] -> m ()
 allocArgs (Def type_ name : exprs) = do
@@ -170,24 +192,27 @@ allocArgs (Def type_ name : exprs) = do
   allocArgs exprs
 allocArgs [] = pure ()
 
-funcBodyBuilder :: MonadIRBuilder m => [Expr] -> [Expr] -> ([Operand] -> m ())
+buildCodeBlock :: (MonadFix m, MonadIRBuilder m) => [Expr] -> m ()
+buildCodeBlock exprBlock = do
+  -- Steps of codegen
+  extractDefs exprBlock
+  emitAll exprBlock
+
+funcBodyBuilder :: (MonadFix m, MonadIRBuilder m) => [Expr] -> [Expr] -> ([Operand] -> m ())
 funcBodyBuilder bodyTokens args = func
   where
     func argOperands = do
-      -- Dirty hack because I'm stupid and can't be bothered to fix it
-      allocArgs args
-      -- Steps of codegen
-      extractDefs bodyTokens
-      emitAll bodyTokens
+      allocArgs args  -- Dirty hack because I'm stupid and can't be bothered to fix it
+      buildCodeBlock bodyTokens
 
-functionAST (Syntax.Function retType name args body) = 
+functionAST (Syntax.Function modifiers retType name args body) = 
   function (Name $ toShort' name) arguments (typeMap ! retType) funcBody
   where arguments = map argDef args
         funcBody = funcBodyBuilder body args
 
 parseTopLevel (expr:exprs) = do
   case expr of
-    (Syntax.Function r n a b) -> functionAST (Syntax.Function r n a b) >> pure ()
+    (Syntax.Function md r n a b) -> functionAST (Syntax.Function md r n a b) >> pure ()
     _ -> pure () -- TODO: return error
   parseTopLevel exprs
 parseTopLevel [] = pure ()

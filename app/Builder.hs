@@ -202,7 +202,8 @@ funcBodyBuilder :: (MonadFix m, MonadIRBuilder m) => [Expr] -> [Expr] -> ([Opera
 funcBodyBuilder bodyTokens args = func
   where
     func argOperands = do
-      allocArgs args  -- Dirty hack because I'm stupid and can't be bothered to fix it
+      block `named` "FuncBody"
+      allocArgs args  -- Dirty hack because I'm stupid and can't be bothered to make it use argOperands (which is the right way)
       buildCodeBlock bodyTokens
 
 functionAST (Syntax.Function modifiers retType name args body) = 

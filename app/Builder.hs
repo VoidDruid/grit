@@ -104,7 +104,7 @@ emitAll :: (MonadFix m, MonadIRBuilder m) => [Expr] -> m ()
 emitAll (expr:exprs) = do
   emit expr
   emitAll exprs
-emitAll [] = pure ()
+emitAll [expr] = emit expr
 
 emit :: (MonadFix m, MonadIRBuilder m) => Expr -> m ()
 emitInner :: MonadIRBuilder m => Expr -> m Operand

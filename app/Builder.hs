@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE LambdaCase #-}
+
 module Builder where
 
 import Control.Monad.Fix (MonadFix)
@@ -122,7 +124,7 @@ emitArgs (expr:exprs) = do
   return ((arg, []) : args)
 emitArgs _ = return []
 
--- UnaryOp
+-- TODO: UnaryOp, inner if as expr? could be sweet, 
 emitInner (BinaryOp operator opr1 opr2) = 
   do
     operand1 <- extractOperand opr1
@@ -174,16 +176,25 @@ emit (Call f e) = emitInner (Call f e) >> pure ()
 emit (If cond blockTrue blockFalse) = mdo
   condition <- emitInner cond
   condBr condition trueBranch falseBranch
-  trueBranch <- buildBranch "true" blockTrue
-  falseBranch <- buildBranch "false" blockFalse
+  trueBranch <- buildBranch "true" blockTrue $ Just mainBr
+  falseBranch <- buildBranch "false" blockFalse Nothing
+  mainBr <- block `named` "MainBranch"
   return ()
 
 emit _ = pure ()
 
-buildBranch name codeBlock = do
-  branch <- block `named` name
-  buildCodeBlock codeBlock
-  return branch
+buildBranch name codeBlock mNext =
+  do
+    branch <- block `named` name
+    buildCodeBlock codeBlock
+    finalInst
+    return branch
+  where 
+    finalInst = case mNext of
+      Nothing -> pure ()
+      Just label -> if any (\case Return _ -> True; _ -> False) codeBlock
+        then pure ()
+        else br label
 
 allocArgs :: MonadIRBuilder m => [Expr] -> m ()
 allocArgs (Def type_ name : exprs) = do

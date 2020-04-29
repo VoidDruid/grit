@@ -80,6 +80,8 @@ referenceIntPointer name = reference integerPointer name
 
 typeMap = Map.fromList [(IntType, i32)]
 
+bodyLabel = "Body"
+
 argName = ("arg_" ++)
 
 argDef (Def defType name) = (typeMap ! defType, ParameterName $ toShort' (argName name))
@@ -124,7 +126,7 @@ emitArgs (expr:exprs) = do
   return ((arg, []) : args)
 emitArgs _ = return []
 
--- TODO: UnaryOp, inner if as expr? could be sweet, 
+-- TODO: UnaryOp, inner if as expr? could be sweet
 emitInner (BinaryOp operator opr1 opr2) = 
   do
     operand1 <- extractOperand opr1
@@ -178,10 +180,16 @@ emit (If cond blockTrue blockFalse) = mdo
   condBr condition trueBranch falseBranch
   trueBranch <- buildBranch "true" blockTrue $ Just mainBr
   falseBranch <- buildBranch "false" blockFalse Nothing
-  mainBr <- block `named` "MainBranch"
+  mainBr <- if isFinal blockTrue -- TODO: also if no more exprs after current If
+    then pure __skip__
+    else block `named` bodyLabel
   return ()
 
 emit _ = pure ()
+
+__skip__ = "__skip__" -- hacky, but no so bad as you think, it's just a placeholder, not a flag
+
+isFinal = any (\case Return _ -> True; _ -> False)
 
 buildBranch name codeBlock mNext =
   do
@@ -192,7 +200,7 @@ buildBranch name codeBlock mNext =
   where 
     finalInst = case mNext of
       Nothing -> pure ()
-      Just label -> if any (\case Return _ -> True; _ -> False) codeBlock
+      Just label -> if isFinal codeBlock
         then pure ()
         else br label
 
@@ -213,7 +221,7 @@ funcBodyBuilder :: (MonadFix m, MonadIRBuilder m) => [Expr] -> [Expr] -> ([Opera
 funcBodyBuilder bodyTokens args = func
   where
     func argOperands = do
-      block `named` "FuncBody"
+      block `named` bodyLabel
       allocArgs args  -- Dirty hack because I'm stupid and can't be bothered to make it use argOperands (which is the right way)
       buildCodeBlock bodyTokens
 
@@ -231,3 +239,15 @@ parseTopLevel [] = pure ()
 
 buildAST :: [Expr] -> Module
 buildAST exprs = buildModule "program" $ parseTopLevel exprs
+
+{- GLOBAL TODOs (prioretized)
+. fix operation priorities in parser
+. sys calls (at least "write")
+. unary operations
+. fix how func arguments are processed
+. support floats
+. support string constants
+. look for errors at AST level, before codegen
+. commit to "everything is expression" and allow assigning ifs and so on?
+. switch, for, while and so on (at this stage we don't need those, but I obviously will have to implement them)
+-}

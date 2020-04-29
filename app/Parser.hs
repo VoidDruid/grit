@@ -28,6 +28,7 @@ op = do
   whitespace
   return o
 
+-- TODO: all ops
 binops = [
   [
    binary "*" Ex.AssocLeft,

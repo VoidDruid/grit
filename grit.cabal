@@ -30,6 +30,7 @@ executable grit-exe
     , Syntax
     , Parser
     , Builder
+    , AST.Processor
     -- Utils
     , StringUtils
   hs-source-dirs:

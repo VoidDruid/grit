@@ -101,10 +101,10 @@ extractDef (BinaryOp "=" maybeDef _) = case maybeDef of
 extractDef _ = pure ()
 
 emitAll :: (MonadFix m, MonadIRBuilder m) => [Expr] -> m ()
+emitAll [expr] = emit expr
 emitAll (expr:exprs) = do
   emit expr
   emitAll exprs
-emitAll [expr] = emit expr
 
 emit :: (MonadFix m, MonadIRBuilder m) => Expr -> m ()
 emitInner :: MonadIRBuilder m => Expr -> m Operand
@@ -225,20 +225,20 @@ funcBodyBuilder bodyTokens args = func
       allocArgs args  -- Dirty hack because I'm stupid and can't be bothered to make it use argOperands (which is the right way)
       buildCodeBlock bodyTokens
 
-functionAST (Syntax.Function modifiers retType name args body) = 
+buildFunction (Syntax.Function modifiers retType name args body) = 
   function (Name $ toShort' name) arguments (typeMap ! retType) funcBody
   where arguments = map argDef args
         funcBody = funcBodyBuilder body args
 
 parseTopLevel (expr:exprs) = do
   case expr of
-    (Syntax.Function md r n a b) -> functionAST (Syntax.Function md r n a b) >> pure ()
+    (Syntax.Function md r n a b) -> buildFunction (Syntax.Function md r n a b) >> pure ()
     _ -> pure () -- TODO: return error
   parseTopLevel exprs
 parseTopLevel [] = pure ()
 
-buildAST :: [Expr] -> Module
-buildAST exprs = buildModule "program" $ parseTopLevel exprs
+buildIR :: [Expr] -> Module
+buildIR exprs = buildModule "program" $ parseTopLevel exprs
 
 {- GLOBAL TODOs (prioretized)
 . fix operation priorities in parser

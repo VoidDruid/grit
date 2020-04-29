@@ -17,6 +17,8 @@ data Expr
   | Var Name
   | Def ExprType Name
   | Call String [Expr]
+  | DecoratorDef ExprType Name CodeBlock
+  | DecoratorTarget
   | Function [Modifier] ExprType Name [Expr] CodeBlock
   | BinaryOp String Expr Expr
   | UnaryOp String Expr

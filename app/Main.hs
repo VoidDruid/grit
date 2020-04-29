@@ -18,14 +18,7 @@ import LLVM.Pretty (ppllvm)
 import JIT
 import qualified Builder as B 
 import qualified Parser as P
-
-processFile fname = do
-  code <- readFile fname
-  let parseResult = P.parseTopLevel code
-  let buildResult = case parseResult of
-        Left err -> Nothing
-        Right result -> Just $ B.buildAST result
-  return (parseResult, buildResult)
+import qualified AST.Processor as A
 
 main :: IO ()
 main =
@@ -34,13 +27,15 @@ main =
     case args of
       []      -> putStrLn "Provide file name!"
       (reverse -> (fname:args)) -> do
-        (mTokens, mIR) <- processFile fname
-        case mTokens of
+        code <- readFile fname
+        case P.parseTopLevel code of
           Left err -> print err
-          Right tokens -> actionFor ["--debug", "-d"] (print tokens >> putStrLn "")
-        case mIR of
-          Nothing -> pure ()
-          Just ir -> actionFor ["--emit", "-e"] (TLIO.putStrLn $ ppllvm ir)
+          Right tokens -> do
+            actionFor ["--debug", "-d"] (print tokens >> putStrLn "")
+            let ast = A.processAST tokens
+            actionFor ["--debug", "-d"] (print ast >> putStrLn "")
+            let ir = B.buildIR ast
+            actionFor ["--emit", "-e"] (TLIO.putStrLn $ ppllvm ir)
         return ()
         where
           actionFor key action = if not (null (key `intersect` args))

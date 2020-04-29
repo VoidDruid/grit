@@ -43,7 +43,7 @@ binops = [
   ]
 
 expr :: Parser Expr
-expr =  Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
+expr =  Ex.buildExpressionParser (binops ++ [[binop]]) factor
 
 exprType :: Parser ExprType
 exprType = do
@@ -88,6 +88,17 @@ function = do
   body <- codeBlock
   return $ Function mods funcType name args body
 
+decoratorDef :: Parser Expr
+decoratorDef = do
+  char '@'
+  funcType <- exprType
+  name <- identifier
+  body <- codeBlock
+  return $ DecoratorDef funcType name body
+
+decoratorTarget :: Parser Expr
+decoratorTarget = reserved "@target" >> return DecoratorTarget
+
 returnF :: Parser Expr
 returnF = do
   reserved "return"
@@ -114,6 +125,7 @@ factor = try floating
       <|> try int
       <|> try call
       <|> try definition
+      <|> try decoratorTarget
       <|> try variable
       <|> try returnF
       <|> ifthen
@@ -128,7 +140,8 @@ contents p = do
 
 toplevel :: Parser [Expr]
 toplevel = many $ do
-    def <- function
+    def <- try function
+       <|> try decoratorDef
     reservedOp ";"
     return def
 

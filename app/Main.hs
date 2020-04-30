@@ -20,14 +20,18 @@ import qualified Parser as P
 import qualified AST.Processor as A
 import qualified Codegen.Builder as B 
 
+parseArgs :: [String] -> ([String], String) -- [flags], filename
+parseArgs (reverse -> (filename:args)) = (args, filename) -- TODO
+
 main :: IO ()
 main =
   do
     args <- getArgs
     case args of
       []      -> putStrLn "Provide file name!"
-      (reverse -> (fname:args)) -> do
-        code <- readFile fname
+      args -> do
+        let (flags, filename) = parseArgs args
+        code <- readFile filename
         case P.parseTopLevel code of
           Left err -> print err
           Right tokens -> do
@@ -38,6 +42,6 @@ main =
             actionFor ["--emit", "-e"] (TLIO.putStrLn $ ppllvm ir)
         return ()
         where
-          actionFor key action = if not (null (key `intersect` args))
+          actionFor key action = if not (null (key `intersect` flags))
             then action
             else pure ()

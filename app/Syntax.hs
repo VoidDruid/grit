@@ -1,5 +1,7 @@
 module Syntax where
 
+import Data.Maybe
+
 type Name = String
 type CodeBlock = [Expr]
 
@@ -19,9 +21,8 @@ data Expr
   | Call String [Expr]
   | DecoratorDef ExprType Name CodeBlock
   | DecoratorTarget
-  | Function [Modifier] ExprType Name [Expr] CodeBlock
+  | Function [Modifier] ExprType Name [Expr] (Maybe Name) CodeBlock
   | BinaryOp String Expr Expr
   | UnaryOp String Expr
   | If Expr CodeBlock CodeBlock
-  | Return Expr
   deriving (Eq, Ord, Show)

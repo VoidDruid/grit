@@ -29,8 +29,11 @@ executable grit-exe
     , Lexer
     , Syntax
     , Parser
-    , Builder
     , AST.Processor
+    , AST.Utils
+    , Codegen.Primitives
+    , Codegen.Builder
+    , Codegen.ASTBridge
     -- Utils
     , StringUtils
   hs-source-dirs:

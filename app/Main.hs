@@ -16,9 +16,9 @@ import qualified LLVM.AST.Float as F
 import LLVM.Pretty (ppllvm)
 
 import JIT
-import qualified Builder as B 
 import qualified Parser as P
 import qualified AST.Processor as A
+import qualified Codegen.Builder as B 
 
 main :: IO ()
 main =

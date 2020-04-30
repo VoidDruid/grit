@@ -1,5 +1,6 @@
 module Parser where
 
+import Data.Maybe
 import Text.Parsec
 import Text.Parsec.String (Parser)
 import Control.Applicative ((<$>))
@@ -85,8 +86,12 @@ function = do
   funcType <- exprType
   name <- identifier
   args <- parens $ commaSep definition
+  mReturns <- optionMaybe $ do
+    reserved "returns"
+    id <- identifier
+    return id
   body <- codeBlock
-  return $ Function mods funcType name args body
+  return $ Function mods funcType name args mReturns body
 
 decoratorDef :: Parser Expr
 decoratorDef = do
@@ -99,12 +104,6 @@ decoratorDef = do
 decoratorTarget :: Parser Expr
 decoratorTarget = reserved "@target" >> return DecoratorTarget
 
-returnF :: Parser Expr
-returnF = do
-  reserved "return"
-  e <- expr
-  return $ Return e
-
 call :: Parser Expr
 call = do
   name <- identifier
@@ -116,9 +115,11 @@ ifthen = do
   reserved "if"
   cond <- parens expr
   tr <- codeBlock
-  reserved "else"
-  fl <- codeBlock
-  return $ If cond tr fl
+  fl <- optionMaybe $ do
+    reserved "else"
+    code <- codeBlock
+    return code
+  return $ If cond tr (fromMaybe [] fl)
 
 factor :: Parser Expr
 factor = try floating
@@ -127,7 +128,6 @@ factor = try floating
       <|> try definition
       <|> try decoratorTarget
       <|> try variable
-      <|> try returnF
       <|> ifthen
       <|> parens expr
 

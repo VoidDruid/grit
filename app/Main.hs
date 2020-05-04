@@ -28,9 +28,8 @@ main =
   do
     args <- getArgs
     case args of
-      []      -> putStrLn "Provide file name!"
+      []   -> putStrLn "Provide file name!"
       args -> do
-        let (flags, filename) = parseArgs args
         code <- readFile filename
         case P.parseTopLevel code of
           Left err -> print err
@@ -42,6 +41,7 @@ main =
             actionFor ["--emit", "-e"] (TLIO.putStrLn $ ppllvm ir)
         return ()
         where
+          (flags, filename) = parseArgs args
           actionFor key action = if not (null (key `intersect` flags))
             then action
             else pure ()

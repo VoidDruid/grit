@@ -14,7 +14,8 @@ data Modifier
   deriving (Eq, Ord, Show)
 
 data Expr
-  = Int Integer
+  = Block CodeBlock
+  | Int Integer
   | Float Double
   | Var Name
   | Def ExprType Name

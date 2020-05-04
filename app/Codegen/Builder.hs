@@ -46,6 +46,8 @@ extractDefs [] = pure ()
 buildCodeBlock :: (MonadFix m, MonadIRBuilder m) => [Expr] -> m Operand
 emit :: (MonadFix m, MonadIRBuilder m) => Expr -> m Operand
 
+emit (Block codeBlock) = buildCodeBlock codeBlock
+
 emit (BinaryOp "=" dest object) =
   do
     value <- emit object
@@ -122,16 +124,11 @@ allocArgs (Def type_ name : exprs) = do
   allocArgs exprs
 allocArgs [] = pure ()
 
-buildCodeBlock exprBlock =
-  do
-    -- Steps of codegen
-    extractDefs exprBlock
-    emitAll exprBlock
-  where
-    emitAll [expr] = emit expr
-    emitAll (expr:exprs) = do
-      emit expr
-      emitAll exprs
+buildCodeBlock exprBlock = do
+  -- Steps of codegen
+  extractDefs exprBlock
+  ops <- mapM emit exprBlock
+  return (last ops)
 
 funcBodyBuilder :: (MonadFix m, MonadIRBuilder m) => [Expr] -> [Expr] -> Maybe Expr -> ([Operand] -> m ())
 funcBodyBuilder bodyTokens args mayReturn = func

@@ -29,19 +29,19 @@ op = do
   whitespace
   return o
 
+opList arity = opList'
+  where 
+    opList' [op] = [arity op Ex.AssocLeft]
+    opList' (op:ops) = arity op Ex.AssocLeft : opList' ops
+
+binList = opList binary
+
 -- TODO: all ops
 binops = [
-  [
-   binary "*" Ex.AssocLeft,
-   binary "/" Ex.AssocLeft
-  ]
- ,[
-   binary "+" Ex.AssocLeft,
-   binary "-" Ex.AssocLeft
-  ]
- ,[binary "<" Ex.AssocLeft]
- ,[binary "=" Ex.AssocLeft]
-  ]
+   binList ["*", "/"]
+ , binList ["+", "-"]
+ , binList ["<", "="]
+ ]
 
 expr :: Parser Expr
 expr =  Ex.buildExpressionParser (binops ++ [[binop]]) factor
@@ -68,6 +68,9 @@ codeBlock = braces $ many $
   do e <- expr
      reserved ";"
      return e
+
+block :: Parser Expr
+block = Block <$> codeBlock
 
 decorator :: Parser Modifier
 decorator = do
@@ -122,7 +125,8 @@ ifthen = do
   return $ If cond tr (fromMaybe [] fl)
 
 factor :: Parser Expr
-factor = try floating
+factor = try block
+      <|> try floating
       <|> try int
       <|> try call
       <|> try definition

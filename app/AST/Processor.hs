@@ -11,9 +11,11 @@ use [] x = x
 use [f] x = f x
 use (f:fs) x = use fs (f x)
 
+-- TODO: checks, errors
+-- TODO: optimizations?
 processAST :: [Expr] -> [Expr]
 processAST= use
-  [ decorateAST
+  [ applyModifications
   ]
 
 walkAST :: (Expr -> Expr) -> [Expr] -> [Expr]
@@ -33,28 +35,28 @@ process' m (If cond brT brF) = If (process m cond) (walkAST m brT) (walkAST m br
 process' m DecoratorTarget = m DecoratorTarget
 process' m e = e
 
--- TODO: can be optimized
-decorateAST :: [Expr] -> [Expr]
-decorateAST ast = 
-    use (map (walkAST . decorateFuncAST) decorators) ast
-    where decorators = extractDecorators ast
+applyModifications :: [Expr] -> [Expr]
+applyModifications ast = walkAST (
+    use [ applyModificationsFunc decorators
+        ]
+    ) ast
+    where decorators = filter (\case DecoratorDef{} -> True; _ -> False) ast 
 
-extractDecorators = filter (\case DecoratorDef{} -> True; _ -> False)
+findDecorator decName decorators =
+    case filter (\case DecoratorDef _ name _ -> name == decName; _ -> False) decorators of
+        [dec] -> dec
+        -- multiple definition errors should be checked earlier
 
-removeDecorator decName = filter (\case Decorator name -> name /= decName; _ -> True)
-
--- TODO: check for type errors and such
-decorateFuncAST (DecoratorDef type_ name decBody) expr = case expr of
-    Function mods t n a r body ->
-        Function newMods t n a r newBody
+-- TODO: check for type errors and such?
+applyModificationsFunc decorators expr = case expr of
+    Function mods' _ _ _ _ _ ->
+        use (map applyMod $ reverse mods') expr
         where
-            (newBody, newMods) = if Decorator name `elem` mods
-                then
-                    (
-                      walkAST (\e -> case e of
-                        DecoratorTarget -> Block body;
-                        _ -> e) decBody
-                    , removeDecorator name mods
-                    )
-                else (body, mods)
+            applyMod m (Function mods t n a r body) = case m of
+                Decorator decName ->
+                    Function mods t n a r newBody
+                    where newBody = decorateFuncAST (findDecorator decName decorators) body
     _ -> expr
+
+decorateFuncAST (DecoratorDef _ _ decBody) body =
+    walkAST (\e -> case e of DecoratorTarget -> Block body; _ -> e) decBody

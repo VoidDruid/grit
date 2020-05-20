@@ -5,6 +5,7 @@ module AST.Processor where
 
 import Control.Exception as E
 
+import AST.Utils
 import StringUtils
 import Syntax
 
@@ -19,10 +20,15 @@ data ModificationsData = ModificationsData { decorators :: [Expr]
 -- TODO: optimizations?
 processAST :: [Expr] -> [Expr]
 processAST ast = use
-  [ applyModifications modsData
+  [ desugarFunctions
+  , applyModifications modsData
+  , dropDecoratorDefinitions
+
   ] ast
   where modsData = ModificationsData { decorators = filter (\case DecoratorDef{} -> True; _ -> False) ast
                                      }
+        dropDecoratorDefinitions
+         = filter (\case DecoratorDef{} -> False; _ -> True)
 
 walkAST :: (Expr -> Expr) -> [Expr] -> [Expr]
 process :: (Expr -> Expr) -> Expr  -> Expr
@@ -30,7 +36,7 @@ process :: (Expr -> Expr) -> Expr  -> Expr
 walkAST m = map (process m)
 process m expr = m (process' m expr)
 
-mapP m = map (process m)
+mapP m = map (process m)  -- same as walkAST, but is used on "lists" of exprs like args, insted of AST - in case processing changes
 
 process' m (Block codeBlock)= Block (walkAST m codeBlock)
 process' m (Call name args) = Call name (mapP m args)
@@ -40,6 +46,16 @@ process' m (UnaryOp op e) = UnaryOp op (process m e)
 process' m (If cond brT brF) = If (process m cond) (walkAST m brT) (walkAST m brF)
 process' m DecoratorTarget = m DecoratorTarget
 process' m e = e
+
+desugarFunctions = walkAST (\expr -> case expr of
+    Function {} -> desugarFunc expr -- if I put desugarFunc logic here, GHC (!!!) crashes: <ghc: panic! (the 'impossible' happened)> 
+    _ -> expr
+    )
+
+desugarFunc func = case func of
+    Function m t n a r body -> Function m t n a Nothing $ case extractFuncRet func of
+        Nothing -> body
+        Just (Def t name) -> Def t name : body ++ [Var name]
 
 findDecorator decName decorators =
     case filter (\case DecoratorDef _ name _ -> name == decName; _ -> False) decorators of
@@ -58,9 +74,7 @@ applyModifications modsData = walkAST (
 applyModificationsFunc ModificationsData { decorators } expr = case expr of
     Function mods' _ _ _ _ _ ->
         use (map applyMod $ reverse mods') expr
+        where
+          applyMod m (Function mods t n a r body) = case m of
+            Decorator decName -> Function [] t n a r $ decorateAST (findDecorator decName decorators) body
     _ -> expr
-    where
-    applyMod m (Function mods t n a r body) = case m of
-        Decorator decName ->
-            Function mods t n a r newBody
-            where newBody = decorateAST (findDecorator decName decorators) body

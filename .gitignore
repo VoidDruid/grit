@@ -1,4 +1,5 @@
 ### User
+notes.txt
 notes/
 main.grt
 main.ir
@@ -47,3 +48,8 @@ cabal.project.local~
 
 # .nfs files are created when an open file is removed but is still being accessed
 .nfs*
+
+### MacOS
+.DS_Store
+.AppleDouble
+.LSOverride

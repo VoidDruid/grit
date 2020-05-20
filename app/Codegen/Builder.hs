@@ -103,6 +103,8 @@ emit (Int i) = pure (int32 i)
 
 emit (Var v) = load (referenceIntPointer v)
 
+emit (Def t name) = allocateDef (Def t name)
+
 emit expr = error ("Impossible expression <" ++ show expr ++ ">")
 
 __skip__ = "__skip__" -- hacky, but no so bad as you think, it's just a placeholder, not a flag
@@ -130,31 +132,20 @@ buildCodeBlock exprBlock = do
   ops <- mapM emit exprBlock
   return (last ops)
 
-funcBodyBuilder :: (MonadFix m, MonadIRBuilder m) => [Expr] -> [Expr] -> Maybe Expr -> ([Operand] -> m ())
-funcBodyBuilder bodyTokens args mayReturn = func
+funcBodyBuilder :: (MonadFix m, MonadIRBuilder m) => [Expr] -> [Expr] -> ([Operand] -> m ())
+funcBodyBuilder bodyTokens args = func
   where
-    func argOperands =
-      mdo
-        block `named` bodyLabel
-        firstInstr
-        allocArgs args   -- Dirty hack because I'm stupid and can't be bothered to make it use argOperands (which is the right way)
-        result <- buildCodeBlock bodyTokens
-        finalInstr result
-      where
-        (firstInstr, finalInstr) = case mayReturn of
-          Nothing -> (pure (), ret)
-          Just (Def type_ name) -> 
-            ( allocateDef (Def type_ name) >> pure ()
-            , \_ -> do
-              ref <- emit (Var name)
-              ret ref
-            )
+    func argOperands = mdo
+      block `named` bodyLabel
+      allocArgs args   -- Dirty hack because I'm stupid and can't be bothered to make it use argOperands (which is the right way)
+      result <- buildCodeBlock bodyTokens
+      ret result
  
 buildFunction func = case func of
-    (Syntax.Function modifiers retType name args mayReturn body) ->
+    (Syntax.Function _ retType name args _ body) ->
       function (Name $ toShort' name) arguments (toLLVMType retType) funcBody
       where arguments = map argDef args
-            funcBody = funcBodyBuilder body args (extractFuncRet func)
+            funcBody = funcBodyBuilder body args
 
 parseTopLevel (expr:exprs) = do
   case expr of

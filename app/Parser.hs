@@ -93,9 +93,6 @@ function = do
     reserved "returns"
     id <- identifier
     return id
-<<<<<<< HEAD
-  body <- codeBlock
-=======
   body <- do
     reserved "="
     block <- optionMaybe codeBlock
@@ -104,7 +101,6 @@ function = do
       Nothing -> do
         e <- expr
         return [e]
->>>>>>> master
   return $ Function mods funcType name args mReturns body
 
 decoratorDef :: Parser Expr
@@ -112,10 +108,7 @@ decoratorDef = do
   char '@'
   funcType <- exprType
   name <- identifier
-<<<<<<< HEAD
-=======
   reserved "="
->>>>>>> master
   body <- codeBlock
   return $ DecoratorDef funcType name body
 

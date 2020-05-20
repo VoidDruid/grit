@@ -31,7 +31,7 @@ main =
       []   -> putStrLn "Provide file name!"
       args -> do
         code <- readFile filename
-        case P.parseTopLevel code of
+        case P.parseCode code of
           Left err -> print err
           Right tokens -> do
             actionFor ["--debug", "-d"] (print tokens >> putStrLn "")

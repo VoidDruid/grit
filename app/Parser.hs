@@ -93,7 +93,14 @@ function = do
     reserved "returns"
     id <- identifier
     return id
-  body <- codeBlock
+  body <- do
+    reserved "="
+    block <- optionMaybe codeBlock
+    case block of
+      Just codeBlock -> return codeBlock
+      Nothing -> do
+        e <- expr
+        return [e]
   return $ Function mods funcType name args mReturns body
 
 decoratorDef :: Parser Expr
@@ -101,6 +108,7 @@ decoratorDef = do
   char '@'
   funcType <- exprType
   name <- identifier
+  reserved "="
   body <- codeBlock
   return $ DecoratorDef funcType name body
 
@@ -152,5 +160,5 @@ toplevel = many $ do
 parseExpr :: String -> Either ParseError Expr
 parseExpr s = parse (contents expr) "<stdin>" s
 
-parseTopLevel :: String -> Either ParseError [Expr]
-parseTopLevel s = parse (contents toplevel) "<stdin>" s
+parseCode :: String -> Either ParseError [Expr]
+parseCode s = parse (contents toplevel) "<stdin>" s

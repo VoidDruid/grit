@@ -52,6 +52,9 @@ exprType = do
   return $ case typeID of
     "int" -> IntType
     "float" -> FloatType
+    "void" -> VoidType
+    "bytes" -> BytesType
+
 
 variable :: Parser Expr
 variable = Var <$> identifier

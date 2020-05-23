@@ -94,7 +94,7 @@ emit (If cond blockTrue blockFalse) = mdo
   resultPointer <- allocateInt -- TODO: type inference or typed ints 
   condBr condition trueBranch falseBranch
   trueBranch <- buildBranch "true" blockTrue resultPointer $ Just mainBr
-  falseBranch <- buildBranch "false" blockFalse resultPointer $ Just mainBr --  FIXME: Should ne Nothing, but breaks ir
+  falseBranch <- buildBranch "false" blockFalse resultPointer $ Just mainBr
   mainBr <- block `named` bodyLabel
   result <- load resultPointer
   return result

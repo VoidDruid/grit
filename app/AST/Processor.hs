@@ -16,14 +16,13 @@ use (f:fs) x = use fs (f x)
 data ModificationsData = ModificationsData { decorators :: [Expr]
                                            }
 
--- TODO: checks, errors
+-- TODO: check for type errors and such
 -- TODO: optimizations?
 processAST :: [Expr] -> [Expr]
 processAST ast = use
-  [ desugarFunctions
+  [ dropDecoratorDefinitions
+  , desugarFunctions
   , applyModifications modsData
-  , dropDecoratorDefinitions
-
   ] ast
   where modsData = ModificationsData { decorators = filter (\case DecoratorDef{} -> True; _ -> False) ast
                                      }
@@ -70,7 +69,7 @@ applyModifications modsData = walkAST (
         ]
     )
 
--- TODO: check for type errors and such?
+applyModificationsFunc :: ModificationsData -> Expr -> Expr
 applyModificationsFunc ModificationsData { decorators } expr = case expr of
     Function mods' _ _ _ _ _ ->
         use (map applyMod $ reverse mods') expr

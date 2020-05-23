@@ -5,7 +5,13 @@ import Data.Maybe
 type Name = String
 type CodeBlock = [Expr]
 
-data ExprType = IntType | FloatType
+data ExprType
+  = VoidType
+  | IntType
+  | FloatType
+  | BytesType
+  | CallableType [ExprType] ExprType
+  | AutoType
   deriving (Eq, Ord, Show)
 
 data Modifier
@@ -27,3 +33,5 @@ data Expr
   | UnaryOp String Expr
   | If Expr CodeBlock CodeBlock
   deriving (Eq, Ord, Show)
+
+data TypedExpr = TypedExpr ExprType Expr

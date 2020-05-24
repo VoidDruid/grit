@@ -22,7 +22,7 @@ import qualified AST.Processor as A
 import qualified Codegen.Builder as B 
 
 parseArgs :: [String] -> ([String], String) -- [flags], filename
-parseArgs (reverse -> (filename:args)) = (args, filename) -- TODO
+parseArgs (reverse -> (filename:args)) = (args, filename) -- TODO: parse incoming arguments
 
 main :: IO ()
 main =

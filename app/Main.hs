@@ -59,6 +59,7 @@ main =
 . simple "auto" type
 . support string constants
 . do, for
-. sys calls (at least "write") - standart functions ("print", firstly)
+. clean up all (most?) of the remaining TODOs, FIXMEs in code
+. sys calls (at least "write") - some standart functions ("print", firstly)
 . switch
 -}

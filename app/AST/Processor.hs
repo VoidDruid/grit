@@ -18,18 +18,19 @@ data ModificationsData = ModificationsData { decorators :: [Expr]
 
 -- TODO: check for type errors and such
 -- TODO: optimizations?
-processAST :: [Expr] -> [Expr]
+processAST :: AST -> AST
 processAST ast = use
   [ dropDecoratorDefinitions
   , desugarFunctions
   , applyModifications modsData
+  --, annotateTypes
   ] ast
   where modsData = ModificationsData { decorators = filter (\case DecoratorDef{} -> True; _ -> False) ast
                                      }
         dropDecoratorDefinitions
          = filter (\case DecoratorDef{} -> False; _ -> True)
 
-walkAST :: (Expr -> Expr) -> [Expr] -> [Expr]
+walkAST :: (Expr -> Expr) -> AST -> AST
 process :: (Expr -> Expr) -> Expr  -> Expr
 
 walkAST m = map (process m)
@@ -63,7 +64,7 @@ findDecorator decName decorators =
 decorateAST (DecoratorDef _ _ decBody) ast =
     walkAST (\e -> case e of DecoratorTarget -> Block ast; _ -> e) decBody
 
-applyModifications :: ModificationsData -> [Expr] -> [Expr]
+applyModifications :: ModificationsData -> AST -> AST
 applyModifications modsData = walkAST (
     use [ applyModificationsFunc modsData
         ]
@@ -77,3 +78,6 @@ applyModificationsFunc ModificationsData { decorators } expr = case expr of
           applyMod m (Function mods t n a r body) = case m of
             Decorator decName -> Function [] t n a r $ decorateAST (findDecorator decName decorators) body
     _ -> expr
+
+annotateTypes :: AST -> TAST
+annotateTypes ast = [TypedExpr IntType (Int 1)]  -- TODO: type annotating

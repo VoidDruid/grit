@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Codegen.Builder where
 
@@ -46,6 +47,12 @@ extractDefs [] = pure ()
 buildCodeBlock :: (MonadFix m, MonadIRBuilder m) => [Expr] -> m Operand
 emit :: (MonadFix m, MonadIRBuilder m) => Expr -> m Operand
 
+emit (Int i) = pure (int32 i)
+
+emit (Var v) = load (referenceIntPointer v)
+
+emit (Def t name) = allocateDef (Def t name)
+
 emit (Block codeBlock) = buildCodeBlock codeBlock
 
 emit (BinaryOp "=" dest object) =
@@ -91,19 +98,22 @@ emit (Call funcName exprs) =
 
 emit (If cond blockTrue blockFalse) = mdo
   condition <- emit cond
-  resultPointer <- allocateInt -- TODO: type inference or typed ints 
+  resultPointer <- allocateInt  -- TODO: type inference
   condBr condition trueBranch falseBranch
   trueBranch <- buildBranch "true" blockTrue resultPointer $ Just mainBr
   falseBranch <- buildBranch "false" blockFalse resultPointer $ Just mainBr
-  mainBr <- block `named` bodyLabel
-  result <- load resultPointer
+  (mainBr, result) <- emitExit resultPointer
   return result
 
-emit (Int i) = pure (int32 i)
-
-emit (Var v) = load (referenceIntPointer v)
-
-emit (Def t name) = allocateDef (Def t name)
+emit (While cond bodyBlock) = mdo
+  resultPointer <- allocateInt  -- TODO: type inference
+  br whileStart  -- we need terminator instruction at the end of the previous block, it will be optimized away
+  whileStart <- block `named` "whileStart"
+  condition <- emit cond
+  condBr condition whileBody mainBr
+  whileBody <- buildBranch "whileBody" bodyBlock resultPointer $ Just whileStart  -- after executing jump to beginning
+  (mainBr, result) <- emitExit resultPointer
+  return result
 
 emit expr = error ("Impossible expression <" ++ show expr ++ ">")
 
@@ -118,6 +128,11 @@ buildBranch name codeBlock resultPointer mNext =
       Nothing -> pure ()
       Just label -> br label
     return branch
+
+emitExit resultPointer = do
+  mainBr <- block `named` bodyLabel
+  result <- load resultPointer
+  return (mainBr, result)
 
 allocArgs :: MonadIRBuilder m => [Expr] -> m ()
 allocArgs (Def type_ name : exprs) = do
@@ -156,14 +171,3 @@ parseTopLevel [] = pure ()
 
 buildIR :: [Expr] -> Module
 buildIR exprs = buildModule "program" $ parseTopLevel exprs
-
-{- GLOBAL TODOs (prioretized)
-. fix operation priorities in parser
-. sys calls (at least "write")
-. unary operations
-. fix how func arguments are processed
-. support floats
-. support string constants
-. look for errors at AST level, before codegen
-. switch, for, while and so on (at this stage we don't need those, but I obviously will have to implement them)
--}

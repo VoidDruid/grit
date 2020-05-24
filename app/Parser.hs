@@ -47,13 +47,20 @@ expr :: Parser Expr
 expr =  Ex.buildExpressionParser (binops ++ [[binop]]) factor
 
 exprType :: Parser ExprType
-exprType = do
-  typeID <- identifier
-  return $ case typeID of
-    "int" -> IntType
-    "float" -> FloatType
-    "void" -> VoidType
-    "bytes" -> BytesType
+exprType =
+  try ( do
+    typeID <- identifier
+    return $ case typeID of
+      "int" -> IntType
+      "float" -> FloatType
+      "void" -> VoidType
+      "bytes" -> BytesType
+      "auto" -> AutoType )
+  <|> try ( parens $ do
+    fromTypes <- commaSep exprType
+    reserved "->"
+    toType <- exprType
+    return $ CallableType fromTypes toType )
 
 
 variable :: Parser Expr
@@ -124,8 +131,8 @@ call = do
   args <- parens $ commaSep expr
   return $ Call name args
 
-ifthen :: Parser Expr
-ifthen = do
+ifelse :: Parser Expr
+ifelse = do
   reserved "if"
   cond <- parens expr
   tr <- codeBlock
@@ -135,15 +142,24 @@ ifthen = do
     return code
   return $ If cond tr (fromMaybe [] fl)
 
+while :: Parser Expr
+while = do
+  reserved "while"
+  cond <- parens expr
+  body <- codeBlock
+  return $ While cond body
+
 factor :: Parser Expr
 factor = try block
+      <|> try function
       <|> try floating
       <|> try int
       <|> try call
       <|> try definition
       <|> try decoratorTarget
       <|> try variable
-      <|> ifthen
+      <|> try ifelse
+      <|> try while
       <|> parens expr
 
 contents :: Parser a -> Parser a
@@ -163,5 +179,5 @@ toplevel = many $ do
 parseExpr :: String -> Either ParseError Expr
 parseExpr s = parse (contents expr) "<stdin>" s
 
-parseCode :: String -> Either ParseError [Expr]
+parseCode :: String -> Either ParseError AST
 parseCode s = parse (contents toplevel) "<stdin>" s

@@ -3,17 +3,21 @@ module Codegen.ASTBridge where
 import Data.Map ((!))
 import qualified Data.Map as Map
 
-import LLVM.AST
-import LLVM.AST.Type as AST
+import LLVM.AST hiding (VoidType)
+import LLVM.AST.Type as AST hiding (VoidType)
 
 import LLVM.IRBuilder.Monad
 import LLVM.IRBuilder.Module
 
-import Syntax
+import Syntax hiding (AST)
 import Codegen.Primitives
 import StringUtils
 
-typeMap = Map.fromList [(IntType, i32)]
+typeMap = Map.fromList 
+  [ (IntType, i32)
+  , (FloatType, double)
+  , (VoidType, void)
+  ]
 
 toLLVMType = (typeMap !)
 

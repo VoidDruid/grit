@@ -16,6 +16,7 @@ import qualified LLVM.AST.Float as F
 import LLVM.Pretty (ppllvm)
 
 import JIT
+import AST.Utils (ppAST)
 import qualified Parser as P
 import qualified AST.Processor as A
 import qualified Codegen.Builder as B 
@@ -34,9 +35,9 @@ main =
         case P.parseCode code of
           Left err -> print err
           Right tokens -> do
-            actionFor ["--debug", "-d"] (print tokens >> putStrLn "")
+            actionFor ["--debug", "-d"] (ppAST tokens >> putStrLn "")
             let ast = A.processAST tokens
-            actionFor ["--debug", "-d"] (print ast >> putStrLn "")
+            actionFor ["--debug", "-d"] (ppAST ast >> putStrLn "")
             let ir = B.buildIR ast
             actionFor ["--emit", "-e"] (TLIO.putStrLn $ ppllvm ir)
         return ()
@@ -45,3 +46,20 @@ main =
           actionFor key action = if not (null (key `intersect` flags))
             then action
             else pure ()
+
+{- GLOBAL TODOs (prioretized)
+. while
+. Annotated AST with type info
+. floats
+. look for errors at AST level - scopes info
+. simple closures
+. fix operation priorities in parser
+. unary operations
+. look for errors at AST level - type mismatch
+. fix how func arguments are processed
+. simple "auto" type
+. support string constants
+. do, for
+. sys calls (at least "write") - standart functions ("print", firstly)
+. switch
+-}

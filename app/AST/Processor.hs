@@ -2,6 +2,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 module AST.Processor where
+import Debug.Trace
 
 import Control.Exception as E
 
@@ -25,6 +26,7 @@ processAST ast = use
   , desugarFunctions
   , applyModifications modsData
   --, annotateTypes
+  , \a -> trace (show (annotateTypes a) ++ "\n") a
   ] ast
   where modsData = ModificationsData { decorators = filter (\case DecoratorDef{} -> True; _ -> False) ast
                                      }

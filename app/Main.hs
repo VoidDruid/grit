@@ -48,7 +48,7 @@ main =
             else pure ()
 
 {- GLOBAL TODOs (prioretized)
-. Annotated AST with type info
+. Annotate AST with type info
 . floats
 . look for errors at AST level - scopes info
 . simple closures

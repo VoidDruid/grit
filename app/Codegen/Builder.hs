@@ -51,7 +51,7 @@ emit (Int i) = pure (int32 i)
 
 emit (Var v) = load (referenceIntPointer v)
 
-emit (Def t name) = allocateDef (Def t name)
+emit expr@(Def t name) = allocateDef expr
 
 emit (Block codeBlock) = buildCodeBlock codeBlock
 
@@ -155,12 +155,12 @@ funcBodyBuilder bodyTokens args = func
       allocArgs args   -- Dirty hack because I'm stupid and can't be bothered to make it use argOperands (which is the right way)
       result <- buildCodeBlock bodyTokens
       ret result
- 
-buildFunction func = case func of
-    (Syntax.Function _ retType name args _ body) ->
-      function (Name $ toShort' name) arguments (toLLVMType retType) funcBody
-      where arguments = map argDef args
-            funcBody = funcBodyBuilder body args
+
+buildFunction :: (MonadModuleBuilder m, MonadFix m) => Expr -> m Operand
+buildFunction func@(Syntax.Function _ retType name args _ body) =
+  function (Name $ toShort' name) arguments (toLLVMType retType) funcBody
+  where arguments = map argDef args
+        funcBody = funcBodyBuilder body args
 
 parseTopLevel (expr:exprs) = do
   case expr of

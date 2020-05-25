@@ -1,7 +1,7 @@
 module Codegen.ASTBridge where
 
-import Data.Map ((!))
-import qualified Data.Map as Map
+import Data.Map.Strict ((!))
+import qualified Data.Map.Strict as Map
 
 import LLVM.AST hiding (VoidType)
 import LLVM.AST.Type as AST hiding (VoidType)

@@ -5,6 +5,7 @@ module AST.Processor where
 
 import Control.Exception as E
 
+import AST.Typing
 import AST.Utils
 import StringUtils
 import Syntax
@@ -52,10 +53,10 @@ desugarFunctions = walkAST (\expr -> case expr of
     _ -> expr
     )
 
-desugarFunc func = case func of
-    Function m t n a r body -> Function m t n a Nothing $ case extractFuncRet func of
-        Nothing -> body
-        Just (Def t name) -> Def t name : body ++ [Var name]
+desugarFunc func@(Function m t n a r body) =
+  Function m t n a Nothing $ case extractFuncRet func of
+    Nothing -> body
+    Just (Def t name) -> Def t name : body ++ [Var name]
 
 findDecorator decName decorators =
     case filter (\case DecoratorDef _ name _ -> name == decName; _ -> False) decorators of
@@ -78,6 +79,3 @@ applyModificationsFunc ModificationsData { decorators } expr = case expr of
           applyMod m (Function mods t n a r body) = case m of
             Decorator decName -> Function [] t n a r $ decorateAST (findDecorator decName decorators) body
     _ -> expr
-
-annotateTypes :: AST -> TAST
-annotateTypes ast = [TypedExpr IntType (Int 1)]  -- TODO: type annotating

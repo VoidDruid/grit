@@ -149,8 +149,15 @@ while = do
   body <- codeBlock
   return $ While cond body
 
+cast :: Parser Expr
+cast = do
+  castedT <- parens exprType
+  e <- expr
+  return $ TypeCast castedT e
+ 
 factor :: Parser Expr
-factor = try block
+factor = try cast
+      <|> try block
       <|> try function
       <|> try floating
       <|> try int

@@ -3,7 +3,7 @@
 module AST.Typing where
 
 import Data.Either
-import Data.Map.Strict hiding (map)
+import Data.Map.Strict hiding (map, foldl)
 import qualified Data.Map.Strict as Map
 
 import StringUtils
@@ -17,6 +17,8 @@ type TypeMap = Map Name ExprType
 emptyTypeMap = Map.empty
 
 -- TODO: this whole module should be rewritten with State monad
+-- TODO: maybe do something smarter with binary and unary operations
+-- TODO: return [TypingError] instead of single TypingError
 
 annotateTypes :: AST -> Either TAST TypingError
 annotateTypes ast = case deduceBlock ast emptyTypeMap of
@@ -34,8 +36,7 @@ deduceType (Block block) tm =
   let tryTAST = deduceBlock block tm in
   case tryTAST of
     Right e -> Right e
-    Left (tast, _) -> Left (TypedExpr blockType (TBlock tast), tm)
-      where TypedExpr blockType _ = last tast
+    Left (tast, _) -> Left (TypedExpr (getLastType tast) (TBlock tast), tm)
 
 deduceType (Def type_ name) tm = Left
   ( TypedExpr type_ (TDef name)
@@ -63,6 +64,7 @@ deduceType (Call func args) tm =
 
 deduceType (Function _ retType name args _ body) tm = 
   let
+    argsNames = map (\case Def _ n -> n) args
     Left (tArgs, argsTm) = deduceBlock args tm
     funcType = CallableType (gatherTypes tArgs) retType
     funcTm = insert name funcType argsTm
@@ -71,12 +73,85 @@ deduceType (Function _ retType name args _ body) tm =
     case tryTBody of
       Right e -> Right e
       Left (tBody, newTm) ->
-        Left (TypedExpr funcType $ TFunction retType name tArgs tBody, newTm)
+        Left (TypedExpr funcType $ TFunction name argsNames tBody, newTm)
 
-deduceType _ tm = Left (TypedExpr IntType (TInt 1), tm)  -- TODO: binary, unary, if, while
+deduceType (UnaryOp op expr) tm = 
+  let tryTExpr = deduceType expr tm in
+  case tryTExpr of
+    Right e -> Right e
+    Left (tExpr@(TypedExpr type_ _), _) ->
+      Left ((TypedExpr type_ $ TUnaryOp op tExpr), tm)
+
+deduceType (BinaryOp op expr1 expr2) tm =
+  let tryOps = deduceBlock [expr1, expr2] tm in
+  case tryOps of
+    Right e -> Right e
+    Left (ops@[op1, op2], _) -> Left (result, tm)
+      where
+        buildT finType = TypedExpr finType (TBinaryOp op op1 op2)
+        leftwiseCast = buildT (getHeadType ops)
+        result
+          | op == "=" = leftwiseCast
+          | op == "/" = buildT FloatType
+          | op `elem` [">", "<", ">=", "<=", "==", "!="] = buildT BooleanType
+          | op `elem` ["%", "//"] = buildT IntType
+          | otherwise = leftwiseCast
+
+deduceType (While eq body) tm =
+  let
+    tryEq = deduceType eq tm
+    tryBody = deduceBlock body tm
+  in
+    -- NOTE: I know its not pretty, but I cant think of something better yet
+    case tryEq of
+      Right e -> Right e
+      Left (tEq, _) ->
+        case tryBody of
+          Right e -> Right e
+          Left (tBody, _) ->
+            Left (TypedExpr (getLastType tBody) (TWhile tEq tBody), tm)
+
+-- Check both branches have equal types
+deduceType (If eq br1 br2) tm = 
+  let
+    tryEq = deduceType eq tm
+    tryBlocks = gatherBlocks [br1, br2] tm
+  in
+    -- NOTE: I know its not pretty, but I cant think of something better yet
+    case tryEq of
+      Right e -> Right e
+      Left (tEq, _) ->
+        case tryBlocks of
+          Right e -> Right e
+          Left ([tBr1, tBr2], _) ->
+            Left (TypedExpr (getLastType tBr1) (TIf tEq tBr1 tBr2), tm)
+
+deduceType (TypeCast type_ expr) tm =
+  let tryExpr = deduceType expr tm in
+  case tryExpr of
+    Right e -> Right e
+    Left (TypedExpr _ tExpr, newTm) -> Left (TypedExpr type_ tExpr, newTm)
+
+foldBlocks :: Either ([TAST], TypeMap) TypingError -> AST -> Either ([TAST], TypeMap) TypingError
+foldBlocks curBlocks nextBlock = case curBlocks of
+  Right e -> Right e
+  Left (eBlocks, tm) ->
+    let tryBlock = deduceBlock nextBlock tm in
+    case tryBlock of
+      Right e -> Right e
+      Left (tBlock, _) -> Left (eBlocks ++ [tBlock], tm)
+
+gatherBlocks :: [AST] -> TypeMap -> Either ([TAST], TypeMap) TypingError
+gatherBlocks ast tm = foldl foldBlocks (Left ([], tm)) ast
 
 gatherTypes :: TAST -> [ExprType]
 gatherTypes tBlock = map (\case TypedExpr type_ _ -> type_) tBlock
+
+getTypeFrom getter tast = case getter tast of
+  TypedExpr type_ _ -> type_
+
+getHeadType = getTypeFrom head
+getLastType = getTypeFrom last
 
 deduceBlock :: CodeBlock Expr -> TypeMap -> Either (TAST, TypeMap) TypingError
 

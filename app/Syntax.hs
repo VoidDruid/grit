@@ -10,6 +10,7 @@ data ExprType
   | IntType
   | FloatType
   | BytesType
+  | BooleanType
   | CallableType [ExprType] ExprType
   | AutoType
   deriving (Eq, Ord, Show)
@@ -20,7 +21,8 @@ data Modifier
   deriving (Eq, Ord, Show)
 
 data Expr
-  = Int Integer
+  = TypeCast ExprType Expr
+  | Int Integer
   | Float Double
   | Var Name
   | Def ExprType Name
@@ -42,7 +44,7 @@ data TExpr
   | TDef Name
   | TBlock (CodeBlock TypedExpr)
   | TCall String [TypedExpr]
-  | TFunction ExprType Name [TypedExpr] (CodeBlock TypedExpr)
+  | TFunction Name [Name] (CodeBlock TypedExpr)
   | TBinaryOp String TypedExpr TypedExpr
   | TUnaryOp String TypedExpr
   | TIf TypedExpr (CodeBlock TypedExpr) (CodeBlock TypedExpr)

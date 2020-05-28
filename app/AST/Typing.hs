@@ -19,6 +19,7 @@ emptyTypeMap = Map.empty
 -- TODO: this whole module should be rewritten with State monad
 -- TODO: maybe do something smarter with binary and unary operations
 -- TODO: return [TypingError] instead of single TypingError
+-- TODO: BinaryOperations float checks?
 
 annotateTypes :: AST -> Either TAST TypingError
 annotateTypes ast = case deduceBlock ast emptyTypeMap of
@@ -80,7 +81,7 @@ deduceType (UnaryOp op expr) tm =
   case tryTExpr of
     Right e -> Right e
     Left (tExpr@(TypedExpr type_ _), _) ->
-      Left ((TypedExpr type_ $ TUnaryOp op tExpr), tm)
+      Left (TypedExpr type_ $ TUnaryOp op tExpr, tm)
 
 deduceType (BinaryOp op expr1 expr2) tm =
   let tryOps = deduceBlock [expr1, expr2] tm in
@@ -145,7 +146,7 @@ gatherBlocks :: [AST] -> TypeMap -> Either ([TAST], TypeMap) TypingError
 gatherBlocks ast tm = foldl foldBlocks (Left ([], tm)) ast
 
 gatherTypes :: TAST -> [ExprType]
-gatherTypes tBlock = map (\case TypedExpr type_ _ -> type_) tBlock
+gatherTypes = map (\case TypedExpr type_ _ -> type_)
 
 getTypeFrom getter tast = case getter tast of
   TypedExpr type_ _ -> type_
@@ -161,4 +162,4 @@ deduceBlock (expr:exprs) tm = case deduceType expr tm of
   Right e -> Right e
   Left (tExpr, newTm) -> case deduceBlock exprs newTm of
     Right e -> Right e
-    Left (tast, newerTm) -> Left ((tExpr : tast), newerTm)
+    Left (tast, newerTm) -> Left (tExpr : tast, newerTm)

@@ -26,7 +26,9 @@ processAST ast = use
   , desugarFunctions
   , applyModifications modsData
   --, annotateTypes
-  , \a -> trace (show (annotateTypes a) ++ "\n") a
+  , \a -> trace (case annotateTypes a of
+      Left tast -> joinedPrettyAST tast ++ "\n"
+      Right e -> show e) a
   ] ast
   where modsData = ModificationsData { decorators = filter (\case DecoratorDef{} -> True; _ -> False) ast
                                      }

@@ -58,8 +58,6 @@ main =
             else pure ()
 
 {- GLOBAL TODOs (prioretized)
-. Annotate AST with type info
-. floats
 . look for errors at AST level - scopes info
 . simple closures
 . fix operation priorities in parser

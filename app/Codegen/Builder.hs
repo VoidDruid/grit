@@ -24,11 +24,6 @@ import Syntax
 import Codegen.Primitives
 import Codegen.ASTBridge
 
-data Context = Context { target :: Operand
-                       } deriving (Show)
-
-type CompilationState = State Context
-
 buildCodeBlock :: (MonadFix m, MonadIRBuilder m) => [TypedExpr] -> m Operand
 emit :: (MonadFix m, MonadIRBuilder m) => TypedExpr -> m Operand
 

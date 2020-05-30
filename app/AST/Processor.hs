@@ -2,12 +2,12 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 module AST.Processor where
-import Debug.Trace
 
 import Control.Exception as E
 
 import AST.Typing
 import AST.Utils
+import AST.Errors
 import StringUtils
 import Syntax
 
@@ -18,17 +18,13 @@ use (f:fs) x = use fs (f x)
 data ModificationsData = ModificationsData { decorators :: [Expr]
                                            }
 
--- TODO: check for type errors and such
+-- TODO: better errors (!!!)
 -- TODO: optimizations?
-processAST :: AST -> AST
-processAST ast = use
+processAST :: AST -> Either TAST [GTypeError]
+processAST ast = annotateTypes $ use -- TODO: change all funcs to Either TAST [e] and move annotateTypes in use list
   [ dropDecoratorDefinitions
   , desugarFunctions
   , applyModifications modsData
-  --, annotateTypes
-  , \a -> trace (case annotateTypes a of
-      Left tast -> joinedPrettyAST tast ++ "\n"
-      Right e -> show e) a
   ] ast
   where modsData = ModificationsData { decorators = filter (\case DecoratorDef{} -> True; _ -> False) ast
                                      }

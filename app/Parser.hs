@@ -11,12 +11,6 @@ import qualified Text.Parsec.Token as Tok
 import Lexer
 import Syntax
 
-int :: Parser Expr
-int = Int <$> integer
-
-floating :: Parser Expr
-floating = Float <$> float
-
 binop = Ex.Infix (BinaryOp <$> op) Ex.AssocLeft
 unop = Ex.Prefix (UnaryOp <$> op)
 
@@ -36,13 +30,13 @@ opList arity = opList'
 
 binList = opList binary
 
--- TODO: all ops
 binops = [
-   binList ["*", "/"]
+   binList ["*", "/", "//", "%"]
  , binList ["+", "-"]
- , binList ["<", "="]
+ , binList ["<", "=", "<=", ">=", "==", "!="]
  ]
 
+-- TODO: Unary ops
 expr :: Parser Expr
 expr =  Ex.buildExpressionParser (binops ++ [[binop]]) factor
 
@@ -59,9 +53,13 @@ exprType =
   <|> try ( parens $ do
     fromTypes <- commaSep exprType
     reserved "->"
-    toType <- exprType
-    return $ CallableType fromTypes toType )
+    CallableType fromTypes <$> exprType )
 
+int :: Parser Expr
+int = Int <$> integer
+
+floating :: Parser Expr
+floating = Float <$> float
 
 variable :: Parser Expr
 variable = Var <$> identifier

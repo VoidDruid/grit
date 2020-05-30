@@ -21,6 +21,14 @@ typeMap = Map.fromList
 
 toLLVMType = (typeMap !)
 
-argDef (Def defType name) = (typeMap ! defType, ParameterName $ toShort' (argName name))
+argDef (TypedExpr defType (TDef name)) = (toLLVMType defType, ParameterName $ toShort' (argName name))
 
-allocateDef (Def defType name) = allocate (typeMap ! defType) `named` toShort' name
+allocateDef (TypedExpr defType (TDef name)) = allocate (toLLVMType defType) `named` toShort' name
+
+allocateT :: MonadIRBuilder m => ExprType -> m Operand
+allocateT type_ = allocate (toLLVMType type_)
+
+pointerTo type_ = AST.PointerType (toLLVMType type_) addrSpace
+
+referenceVar :: ExprType -> String -> Operand
+referenceVar varType = reference (pointerTo varType)

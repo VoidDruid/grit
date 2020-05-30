@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Codegen.Builder where
 
@@ -32,52 +31,40 @@ data Context = Context { target :: Operand
 
 type CompilationState = State Context
 
-extractDefs :: MonadIRBuilder m => [Expr] -> m ()
-extractDefs (expr:exprs) = do
-  case expr of
-    (BinaryOp "=" maybeDef _) ->  case maybeDef of
-      Def defType defName -> do
-        allocateDef maybeDef
-        pure ()
-      _ -> pure ()
-    _ -> pure ()
-  extractDefs exprs
-extractDefs [] = pure ()
+buildCodeBlock :: (MonadFix m, MonadIRBuilder m) => [TypedExpr] -> m Operand
+emit :: (MonadFix m, MonadIRBuilder m) => TypedExpr -> m Operand
 
-buildCodeBlock :: (MonadFix m, MonadIRBuilder m) => [Expr] -> m Operand
-emit :: (MonadFix m, MonadIRBuilder m) => Expr -> m Operand
+emit (view -> (_, TInt i)) = pure (int32 i)
 
-emit (Int i) = pure (int32 i)
+emit (view -> (type_, TVar v)) = load (referenceVar type_ v)
 
-emit (Var v) = load (referenceIntPointer v)
+emit def@(view -> (_, TDef _)) = allocateDef def
 
-emit expr@(Def t name) = allocateDef expr
+emit (view -> (_, TBlock codeBlock)) = buildCodeBlock codeBlock
 
-emit (Block codeBlock) = buildCodeBlock codeBlock
-
-emit (BinaryOp "=" dest object) =
+emit (view -> (_, TBinaryOp "=" dest object)) =
   do
     value <- emit object
-    store (referenceIntPointer name) value
+    (type_, name) <- getTypeName
+    store (referenceVar type_ name) value
     return value -- Kinda like C++ '='
   where
-    name = case dest of 
-      Def _ n -> n
-      Var n -> n
+    getTypeName = case view dest of 
+      (t, TDef n) -> allocateDef dest >> return (t, n)
+      (t, TVar n) -> return (t, n)
 
 -- TODO: UnaryOp
-emit (BinaryOp operator opr1 opr2) = 
+emit (view -> (type_, TBinaryOp operator opr1 opr2)) = 
   do
     operand1 <- emit opr1
     operand2 <- emit opr2
     operation operand1 operand2
   where
-    operation = case operator of
+    operation = case operator of  -- TODO: type checking
       "+" -> add
       "-" -> sub
       "*" -> mul
       --"/" -> div
-      -- TODO: support float
       "<" -> icmp IPredicats.SLT
       ">" -> icmp IPredicats.SGT
       "==" -> icmp IPredicats.EQ
@@ -85,7 +72,7 @@ emit (BinaryOp operator opr1 opr2) =
       "<=" -> icmp IPredicats.SLE
       ">=" -> icmp IPredicats.SGE
 
-emit (Call funcName exprs) =
+emit (view -> (_, TCall funcName exprs)) =
   do
     args <- emitArgs exprs
     call (makeFuncRef funcName) args
@@ -96,17 +83,17 @@ emit (Call funcName exprs) =
       return ((arg, []) : args)
     emitArgs _ = return []
 
-emit (If cond blockTrue blockFalse) = mdo
+emit (view -> (type_, TIf cond blockTrue blockFalse)) = mdo
   condition <- emit cond
-  resultPointer <- allocateInt  -- TODO: type inference
+  resultPointer <- allocateT type_ 
   condBr condition trueBranch falseBranch
   trueBranch <- buildBranch "true" blockTrue resultPointer $ Just mainBr
   falseBranch <- buildBranch "false" blockFalse resultPointer $ Just mainBr
   (mainBr, result) <- emitExit resultPointer
   return result
 
-emit (While cond bodyBlock) = mdo
-  resultPointer <- allocateInt  -- TODO: type inference
+emit (view -> (type_, TWhile cond bodyBlock)) = mdo
+  resultPointer <- allocateT type_
   br whileStart  -- we need terminator instruction at the end of the previous block, it will be optimized away
   whileStart <- block `named` "whileStart"
   condition <- emit cond
@@ -116,8 +103,6 @@ emit (While cond bodyBlock) = mdo
   return result
 
 emit expr = error ("Impossible expression <" ++ show expr ++ ">")
-
-__skip__ = "__skip__" -- hacky, but no so bad as you think, it's just a placeholder, not a flag
 
 buildBranch name codeBlock resultPointer mNext =
   do
@@ -134,20 +119,19 @@ emitExit resultPointer = do
   result <- load resultPointer
   return (mainBr, result)
 
-allocArgs :: MonadIRBuilder m => [Expr] -> m ()
-allocArgs (Def type_ name : exprs) = do
-  p <- allocateInt `named` toShort' name
-  store p (referenceInt $ argName name)
+allocArgs :: MonadIRBuilder m => [TypedExpr] -> m ()
+allocArgs ((TypedExpr type_ (TDef name)) : exprs) = do
+  p <- (allocateT type_) `named` toShort' name
+  store p (referenceVar type_ $ argName name)
   allocArgs exprs
 allocArgs [] = pure ()
 
 buildCodeBlock exprBlock = do
   -- Steps of codegen
-  extractDefs exprBlock
   ops <- mapM emit exprBlock
   return (last ops)
 
-funcBodyBuilder :: (MonadFix m, MonadIRBuilder m) => [Expr] -> [Expr] -> ([Operand] -> m ())
+funcBodyBuilder :: (MonadFix m, MonadIRBuilder m) => [TypedExpr] -> [TypedExpr] -> ([Operand] -> m ())
 funcBodyBuilder bodyTokens args = func
   where
     func argOperands = mdo
@@ -156,18 +140,17 @@ funcBodyBuilder bodyTokens args = func
       result <- buildCodeBlock bodyTokens
       ret result
 
-buildFunction :: (MonadModuleBuilder m, MonadFix m) => Expr -> m Operand
-buildFunction func@(Syntax.Function _ retType name args _ body) =
+buildFunction :: (MonadModuleBuilder m, MonadFix m) => ExprType -> TExpr -> m Operand
+buildFunction (CallableType argsTypes retType) func@(TFunction name argsNames body) =
   function (Name $ toShort' name) arguments (toLLVMType retType) funcBody
-  where arguments = map argDef args
-        funcBody = funcBodyBuilder body args
+  where typedArgs =  [TypedExpr t_ (TDef n) | t_ <- argsTypes, n <- argsNames]
+        arguments = map argDef typedArgs
+        funcBody = funcBodyBuilder body typedArgs
 
-parseTopLevel (expr:exprs) = do
-  case expr of
-    (Syntax.Function md t n a r b) -> buildFunction (Syntax.Function md t n a r b) >> pure ()
-    _ -> pure () -- TODO: return error
+parseTopLevel ((TypedExpr t f):exprs) = do
+  buildFunction t f >> pure ()
   parseTopLevel exprs
 parseTopLevel [] = pure ()
 
-buildIR :: [Expr] -> Module
+buildIR :: TAST -> Module
 buildIR exprs = buildModule "program" $ parseTopLevel exprs

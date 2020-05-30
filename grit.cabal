@@ -32,6 +32,7 @@ executable grit-exe
     , AST.Processor
     , AST.Utils
     , AST.Typing
+    , AST.Errors
     , Codegen.Primitives
     , Codegen.Builder
     , Codegen.ASTBridge

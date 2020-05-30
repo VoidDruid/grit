@@ -17,9 +17,12 @@ import LLVM.Pretty (ppllvm)
 
 import JIT
 import AST.Utils (ppAST)
+import AST.Errors (showE)
 import qualified Parser as P
 import qualified AST.Processor as A
 import qualified Codegen.Builder as B 
+
+import StringUtils
 
 parseArgs :: [String] -> ([String], String) -- [flags], filename
 parseArgs (reverse -> (filename:args)) = (args, filename) -- TODO: parse incoming arguments
@@ -34,12 +37,15 @@ main =
         code <- readFile filename
         case P.parseCode code of
           Left err -> print err
-          Right tokens -> do
-            actionFor ["--debug", "-d"] (ppAST tokens >> putStrLn "")
-            let ast = A.processAST tokens
+          Right ast -> do
             actionFor ["--debug", "-d"] (ppAST ast >> putStrLn "")
-            let ir = B.buildIR ast
-            actionFor ["--emit", "-e"] (TLIO.putStrLn $ ppllvm ir)
+            let maybeTAST = A.processAST ast
+            case maybeTAST of
+              Right errors -> putStrLn $ joinN (map showE errors)
+              Left tast -> do
+                actionFor ["--debug", "-d"] (ppAST tast >> putStrLn "")
+                let ir = B.buildIR tast
+                actionFor ["--emit", "-e"] (TLIO.putStrLn $ ppllvm ir)
         return ()
         where
           (flags, filename) = parseArgs args

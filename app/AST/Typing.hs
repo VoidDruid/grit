@@ -6,11 +6,9 @@ import Data.Either
 import Data.Map.Strict hiding (map, foldl)
 import qualified Data.Map.Strict as Map
 
+import AST.Errors
 import StringUtils
 import Syntax
-
-newtype TypingError = TypingError String
-  deriving Show
 
 type TypeMap = Map Name ExprType
 
@@ -18,20 +16,20 @@ emptyTypeMap = Map.empty
 
 -- TODO: this whole module should be rewritten with State monad
 -- TODO: maybe do something smarter with binary and unary operations
--- TODO: return [TypingError] instead of single TypingError
+-- TODO: return [GTypeError] instead of single GTypeError
 -- TODO: BinaryOperations float checks?
 
-annotateTypes :: AST -> Either TAST TypingError
+annotateTypes :: AST -> Either TAST [GTypeError]
 annotateTypes ast = case deduceBlock ast emptyTypeMap of
-  Right e -> Right e
+  Right e -> Right [e] -- TODO: type list from deduceType
   Left (tast, _) -> Left tast
 
-lookupType :: String -> TypeMap -> Either ExprType TypingError
+lookupType :: String -> TypeMap -> Either ExprType GTypeError
 lookupType name typeMap = case typeMap !? name of
   Just t -> Left t
-  Nothing -> Right (TypingError $ "No definition for <" ++ name ++ "> could be found")
+  Nothing -> Right (GTypeError $ "No definition for <" ++ name ++ "> could be found")
 
-deduceType :: Expr -> TypeMap -> Either (TypedExpr, TypeMap) TypingError
+deduceType :: Expr -> TypeMap -> Either (TypedExpr, TypeMap) GTypeError
 
 deduceType (Block block) tm = 
   let tryTAST = deduceBlock block tm in
@@ -133,7 +131,7 @@ deduceType (TypeCast type_ expr) tm =
     Right e -> Right e
     Left (TypedExpr _ tExpr, newTm) -> Left (TypedExpr type_ tExpr, newTm)
 
-foldBlocks :: Either ([TAST], TypeMap) TypingError -> AST -> Either ([TAST], TypeMap) TypingError
+foldBlocks :: Either ([TAST], TypeMap) GTypeError -> AST -> Either ([TAST], TypeMap) GTypeError
 foldBlocks curBlocks nextBlock = case curBlocks of
   Right e -> Right e
   Left (eBlocks, tm) ->
@@ -142,7 +140,7 @@ foldBlocks curBlocks nextBlock = case curBlocks of
       Right e -> Right e
       Left (tBlock, _) -> Left (eBlocks ++ [tBlock], tm)
 
-gatherBlocks :: [AST] -> TypeMap -> Either ([TAST], TypeMap) TypingError
+gatherBlocks :: [AST] -> TypeMap -> Either ([TAST], TypeMap) GTypeError
 gatherBlocks ast tm = foldl foldBlocks (Left ([], tm)) ast
 
 gatherTypes :: TAST -> [ExprType]
@@ -154,7 +152,7 @@ getTypeFrom getter tast = case getter tast of
 getHeadType = getTypeFrom head
 getLastType = getTypeFrom last
 
-deduceBlock :: CodeBlock Expr -> TypeMap -> Either (TAST, TypeMap) TypingError
+deduceBlock :: CodeBlock Expr -> TypeMap -> Either (TAST, TypeMap) GTypeError
 
 deduceBlock [] tm = Left ([], tm)
 

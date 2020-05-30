@@ -1,7 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module Syntax where
-import Debug.Trace
 
 import Data.Maybe
 
@@ -130,3 +129,5 @@ instance Pretty TypedExpr where
     (tT -> (t, TUnaryOp op e)) -> joinOrSplit ["UnaryOp " ++ [head t] ++ op] e
     (tT -> (t, TIf eq bl1 bl2)) -> addToLast (joinOrSplit ["If " ++ t] eq) " {" ++ prettify bl1 ++ ["}", "else {"] ++ prettify bl2 ++ ["}"]
     (tT -> (t, TWhile eq bl)) -> addToLast (joinOrSplit ["While " ++ t] eq) " {" ++ prettify bl ++ ["}"]
+
+view (TypedExpr t e) = (t, e)

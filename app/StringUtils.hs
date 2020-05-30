@@ -19,7 +19,7 @@ toShort' = toShort . BSU.fromString
 
 addToLast :: [String] -> String -> [String]
 addToLast [s] str = [s ++ str]
-addToLast (reverse -> s:ss) str = ss ++ [s ++ str]
+addToLast (reverse -> s:ss) str = reverse ss ++ [s ++ str]
 
 joinS = unwords
 joinN = intercalate "\n"

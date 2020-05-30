@@ -131,3 +131,5 @@ instance Pretty TypedExpr where
     (tT -> (t, TWhile eq bl)) -> addToLast (joinOrSplit ["While " ++ t] eq) " {" ++ prettify bl ++ ["}"]
 
 view (TypedExpr t e) = (t, e)
+typeOnly (TypedExpr t _) = t
+exprOnly (TypedExpr _ e) = e

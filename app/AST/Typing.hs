@@ -85,7 +85,7 @@ deduceType (BinaryOp op expr1 expr2) tm =
   let tryOps = deduceBlock [expr1, expr2] tm in
   case tryOps of
     Right e -> Right e
-    Left (ops@[op1, op2], _) -> Left (result, tm)
+    Left (ops@[op1, op2], newTm) -> Left (result, newTm)
       where
         buildT finType = TypedExpr finType (TBinaryOp op op1 op2)
         leftwiseCast = buildT (getHeadType ops)

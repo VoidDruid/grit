@@ -24,6 +24,9 @@ import qualified Codegen.Builder as B
 
 import StringUtils
 
+debugFlag = ["--debug", "-d"]
+emitFlag = ["--emit", "-e"]
+
 parseArgs :: [String] -> ([String], String) -- [flags], filename
 parseArgs (reverse -> (filename:args)) = (args, filename) -- TODO: parse incoming arguments
 
@@ -35,17 +38,18 @@ main =
       []   -> putStrLn "Provide file name!"
       args -> do
         code <- readFile filename
+        actionFor debugFlag (putStrLn $ filename ++ "\n")
         case P.parseCode code of
           Left err -> print err
           Right ast -> do
-            actionFor ["--debug", "-d"] (ppAST ast >> putStrLn "")
+            actionFor debugFlag (ppAST ast >> putStrLn "")
             let maybeTAST = A.processAST ast
             case maybeTAST of
               Right errors -> putStrLn $ joinN (map showE errors)
               Left tast -> do
-                actionFor ["--debug", "-d"] (ppAST tast >> putStrLn "")
+                actionFor debugFlag (ppAST tast >> putStrLn "")
                 let ir = B.buildIR tast
-                actionFor ["--emit", "-e"] (TLIO.putStrLn $ ppllvm ir)
+                actionFor emitFlag (TLIO.putStrLn $ ppllvm ir)
         return ()
         where
           (flags, filename) = parseArgs args

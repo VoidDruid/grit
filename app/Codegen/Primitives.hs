@@ -13,7 +13,7 @@ import qualified LLVM.AST.Constant as C
 
 import LLVM.IRBuilder.Monad
 import LLVM.IRBuilder.Instruction hiding (load, store)
-import LLVM.IRBuilder.Constant
+import LLVM.IRBuilder.Constant hiding (double)
 import qualified LLVM.IRBuilder.Instruction as I
 
 import StringUtils
@@ -72,3 +72,7 @@ makeFuncRef funcName = ConstantOperand (C.GlobalReference funcType $ globalName 
 bodyLabel = toShort' "Body"
 
 argName = ("arg_" ++)
+
+intToFloat op = sitofp op double
+
+floatToInt op = fptosi op i32

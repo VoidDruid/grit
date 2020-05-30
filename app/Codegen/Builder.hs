@@ -11,8 +11,6 @@ import Data.Maybe
 
 import LLVM.AST hiding (function, alignment, Call)
 import LLVM.AST.ParameterAttribute (ParameterAttribute)
-import qualified LLVM.AST.IntegerPredicate as IPredicats
-import qualified LLVM.AST.FloatingPointPredicate as FPredicats
 
 import LLVM.IRBuilder.Module
 import LLVM.IRBuilder.Monad
@@ -36,17 +34,20 @@ emit :: (MonadFix m, MonadIRBuilder m) => TypedExpr -> m Operand
 
 emit (view -> (_, TInt i)) = pure (int32 i)
 
+emit (view -> (_, TFloat f)) = pure (double f)
+
 emit (view -> (type_, TVar v)) = load (referenceVar type_ v)
 
 emit def@(view -> (_, TDef _)) = allocateDef def
 
 emit (view -> (_, TBlock codeBlock)) = buildCodeBlock codeBlock
 
-emit (view -> (_, TBinaryOp "=" dest object)) =
+emit (view -> (type_, TBinaryOp "=" dest object)) =
   do
     value <- emit object
-    (type_, name) <- getTypeName
-    store (referenceVar type_ name) value
+    correctedValue <- convert (typeOnly object) type_ value
+    (t, name) <- getTypeName
+    store (referenceVar t name) correctedValue
     return value -- Kinda like C++ '='
   where
     getTypeName = case view dest of 
@@ -54,23 +55,17 @@ emit (view -> (_, TBinaryOp "=" dest object)) =
       (t, TVar n) -> return (t, n)
 
 -- TODO: UnaryOp
-emit (view -> (type_, TBinaryOp operator opr1 opr2)) = 
+emit (view -> (type_, TBinaryOp operator opr1 opr2)) =
   do
     operand1 <- emit opr1
     operand2 <- emit opr2
-    operation operand1 operand2
+    correctedOp1 <- convert (typeOnly opr1) opType operand1
+    correctedOp2 <- convert (typeOnly opr2) opType operand2
+    (findOperation opType operator) correctedOp1 correctedOp2
   where
-    operation = case operator of  -- TODO: type checking
-      "+" -> add
-      "-" -> sub
-      "*" -> mul
-      --"/" -> div
-      "<" -> icmp IPredicats.SLT
-      ">" -> icmp IPredicats.SGT
-      "==" -> icmp IPredicats.EQ
-      "!=" -> icmp IPredicats.NE
-      "<=" -> icmp IPredicats.SLE
-      ">=" -> icmp IPredicats.SGE
+    opType = if operator `elem` cmpOps
+      then typeOnly opr1  -- left bias
+      else type_
 
 emit (view -> (_, TCall funcName exprs)) =
   do

@@ -46,6 +46,7 @@ data Expr
   | Float Double
   | Var Name
   | Def ExprType Name
+  | ClosureEnv ExprType Name  -- CallableType (closure type) and struct typename for env
   | DecoratorTarget
   | DecoratorDef ExprType Name (CodeBlock Expr)
   | Block (CodeBlock Expr)

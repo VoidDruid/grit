@@ -61,18 +61,32 @@ deduceType (Call func args) tm =
         Right e -> Right e
         Left (tArgs, _) -> Left (TypedExpr type_ (TCall func tArgs), tm)
 
-deduceType (Function _ retType name args _ body) tm = 
+deduceType (Function _ retType name args returnsM body) tm = 
   let
     argsNames = map (\case Def _ n -> n) args
     Left (tArgs, argsTm) = deduceBlock args tm
-    funcType = CallableType (gatherTypes tArgs) retType
-    funcTm = insert name funcType argsTm
+    buildCallableT t = CallableType (gatherTypes tArgs) t
+    funcTm
+      | retType == AutoType = tm
+      | otherwise = insert name (buildCallableT retType) argsTm
     tryTBody = deduceBlock body funcTm
   in
     case tryTBody of
       Right e -> Right e
       Left (tBody, newTm) ->
-        Left (TypedExpr funcType $ TFunction name argsNames tBody, newTm)
+        let
+          tryFuncRetType :: Either ExprType GTypeError
+          tryFuncRetType
+            | retType == AutoType = case returnsM of
+              Nothing -> Left (getLastType tBody)
+              Just retN -> lookupType retN newTm
+            | otherwise = Left retType
+        in
+          case tryFuncRetType of
+            Right e -> Right e
+            Left funcRetType -> Left (TypedExpr funcType $ TFunction name argsNames tBody, newTm)
+              where funcType = buildCallableT funcRetType
+            
 
 deduceType (UnaryOp op expr) tm = 
   let tryTExpr = deduceType expr tm in
@@ -81,16 +95,31 @@ deduceType (UnaryOp op expr) tm =
     Left (tExpr@(TypedExpr type_ _), _) ->
       Left (TypedExpr type_ $ TUnaryOp op tExpr, tm)
 
-deduceType (BinaryOp op expr1 expr2) tm =
+deduceType binOp@(BinaryOp op expr1 expr2) tm =
   let tryOps = deduceBlock [expr1, expr2] tm in
   case tryOps of
     Right e -> Right e
-    Left (ops@[op1, op2], newTm) -> Left (result, newTm)
+    Left (ops@[op1@(TypedExpr _ innerOp1), op2], newTm) -> result
       where
-        buildT finType = TypedExpr finType (TBinaryOp op op1 op2)
-        leftwiseCast = buildT (getHeadType ops)
+        leftType = getHeadType ops
+        rightType = getLastType ops
+        leftwiseCast = buildT leftType
+        buildT finType = Left (TypedExpr finType (TBinaryOp op op1 op2), newTm)
         result
-          | op == "=" = leftwiseCast
+          | op == "=" = if rightType == AutoType
+            then Right (GTypeError $ joinN ("Could not deduce type from assignment of auto" : prettify binOp))
+            else if leftType == AutoType
+              then
+                let
+                  leftName = case expr1 of
+                    (Def _ n) -> n
+                    (Var n) -> n
+                in
+                  Left (
+                         TypedExpr rightType (TBinaryOp op (TypedExpr rightType innerOp1) op2)
+                       , insert leftName rightType newTm
+                       )
+              else leftwiseCast
           | op == "/" = buildT FloatType
           | op `elem` [">", "<", ">=", "<=", "==", "!="] = buildT BooleanType
           | op `elem` ["%", "//"] = buildT IntType
@@ -154,10 +183,22 @@ getLastType = getTypeFrom last
 
 deduceBlock :: CodeBlock Expr -> TypeMap -> Either (TAST, TypeMap) GTypeError
 
-deduceBlock [] tm = Left ([], tm)
-
-deduceBlock (expr:exprs) tm = case deduceType expr tm of
+deduceBlock block tm = case deduceBlock' block tm of
   Right e -> Right e
-  Left (tExpr, newTm) -> case deduceBlock exprs newTm of
+  Left (bl, newTm) -> Left (fixAutoDefs bl newTm, newTm)
+
+deduceBlock' [] tm = Left ([], tm)
+deduceBlock' (expr:exprs) tm = case deduceType expr tm of
+  Right e -> Right e
+  Left (tExpr, newTm) -> case deduceBlock' exprs newTm of
     Right e -> Right e
     Left (tast, newerTm) -> Left (tExpr : tast, newerTm)
+
+fixAutoDefs block tm = foldl replaceAuto [] block
+  where
+    replaceAuto es nextE = es ++ [e]
+      where
+        e = case nextE of
+          (TypedExpr _ def@(TDef n)) -> TypedExpr t def
+            where (Left t) = lookupType n tm
+          _ -> nextE

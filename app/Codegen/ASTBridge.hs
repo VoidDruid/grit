@@ -40,6 +40,7 @@ referenceVar varType = reference (pointerTo varType)
 
 cmpOps = [">", "<", "==", "!=", "<=", ">="]
 
+-- TODO: %, //
 opTable :: MonadIRBuilder m => Map.Map ExprType (Map.Map String (Operand -> Operand -> m Operand))
 opTable = Map.fromList [(IntType, intMap), (FloatType, floatMap)]
   where
@@ -57,7 +58,12 @@ opTable = Map.fromList [(IntType, intMap), (FloatType, floatMap)]
       , [ ("+", fadd)
         , ("-", fsub)
         , ("*", fmul)
-        -- TODO: cmp
+        , ("<", fcmp FPredicats.OLT)
+        , (">", fcmp FPredicats.OGT)
+        , ("==", fcmp FPredicats.OEQ)
+        , ("!=", fcmp FPredicats.ONE)
+        , ("<=", fcmp FPredicats.OLE)
+        , (">=", fcmp FPredicats.OGE)
         ]
       ]
 

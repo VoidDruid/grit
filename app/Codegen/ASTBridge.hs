@@ -38,6 +38,9 @@ pointerTo type_ = AST.PointerType (toLLVMType type_) addrSpace
 referenceVar :: ExprType -> String -> Operand
 referenceVar varType = reference (pointerTo varType)
 
+referenceLocal :: ExprType -> String -> Operand
+referenceLocal varType = reference (toLLVMType varType)
+
 cmpOps = [">", "<", "==", "!=", "<=", ">="]
 
 -- TODO: %, //

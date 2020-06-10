@@ -112,7 +112,7 @@ emitExit resultPointer = do
 allocArgs :: MonadIRBuilder m => [TypedExpr] -> m ()
 allocArgs ((TypedExpr type_ (TDef name)) : exprs) = do
   p <- (allocateT type_) `named` toShort' name
-  store p (referenceVar type_ $ argName name)
+  store p (referenceLocal type_ $ argName name)
   allocArgs exprs
 allocArgs [] = pure ()
 

@@ -111,7 +111,7 @@ emitExit resultPointer = do
 
 allocArgs :: MonadIRBuilder m => [TypedExpr] -> m ()
 allocArgs ((TypedExpr type_ (TDef name)) : exprs) = do
-  p <- (allocateT type_) `named` toShort' name
+  p <- allocateT type_ `named` toShort' name
   store p (referenceLocal type_ $ argName name)
   allocArgs exprs
 allocArgs [] = pure ()
@@ -133,7 +133,7 @@ funcBodyBuilder bodyTokens args = func
 buildFunction :: (MonadModuleBuilder m, MonadFix m) => ExprType -> TExpr -> m Operand
 buildFunction (CallableType argsTypes retType) func@(TFunction name argsNames body) =
   function (Name $ toShort' name) arguments (toLLVMType retType) funcBody
-  where typedArgs =  [TypedExpr t_ (TDef n) | t_ <- argsTypes, n <- argsNames]
+  where typedArgs =  [TypedExpr (argsTypes !! i) (TDef (argsNames !! i)) | i <- [0..(length argsNames - 1)]]
         arguments = map argDef typedArgs
         funcBody = funcBodyBuilder body typedArgs
 

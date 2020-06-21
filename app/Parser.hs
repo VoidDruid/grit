@@ -123,6 +123,22 @@ decoratorDef = do
 decoratorTarget :: Parser Expr
 decoratorTarget = reserved "@target" >> return DecoratorTarget
 
+decoratorArg :: Parser Expr
+decoratorArg = do
+  string "@args."
+  number <- integer
+  return $ DecoratorArg (fromIntegral number)
+
+decoratorArgsAttr = do
+  string "@args."
+  attr <- identifier
+  return $ DecoratorArgsAttr attr
+
+decoratorArgsMethod = do
+  string "@args."
+  method <- call
+  return $ DecoratorArgsMethod method
+
 call :: Parser Expr
 call = do
   name <- identifier
@@ -162,6 +178,9 @@ factor = try cast
       <|> try call
       <|> try definition
       <|> try decoratorTarget
+      <|> try decoratorArgsMethod
+      <|> try decoratorArg
+      <|> try decoratorArgsAttr
       <|> try variable
       <|> try ifelse
       <|> try while

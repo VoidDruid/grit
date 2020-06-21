@@ -62,8 +62,16 @@ findDecorator decName decorators =
     case filter (\case DecoratorDef _ name _ -> name == decName; _ -> False) decorators of
         [dec] -> dec
 
-decorateAST (DecoratorDef _ _ decBody) ast =
-    walkAST (\e -> case e of DecoratorTarget -> Block ast; _ -> e) decBody
+decorateAST :: Expr -> [Expr] -> AST -> AST
+decorateAST (DecoratorDef _ _ decBody) args ast =
+    walkAST (\e -> case e of 
+        DecoratorTarget -> Block ast;
+        DecoratorArg number -> 
+            let (Def _ argName) = args !! number in
+            Var argName;
+        DecoratorArgsAttr attr
+          | attr == "size" -> Int (toInteger $ length args)
+        _ -> e) decBody
 
 applyModifications :: ModificationsData -> AST -> AST
 applyModifications modsData = walkAST (
@@ -77,5 +85,5 @@ applyModificationsFunc ModificationsData { decorators } expr = case expr of
         use (map applyMod $ reverse mods') expr
         where
           applyMod m (Function mods t n a r body) = case m of
-            Decorator decName -> Function [] t n a r $ decorateAST (findDecorator decName decorators) body
+            Decorator decName -> Function [] t n a r $ decorateAST (findDecorator decName decorators) a body
     _ -> expr

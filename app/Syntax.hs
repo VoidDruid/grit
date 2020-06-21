@@ -3,6 +3,7 @@
 module Syntax where
 
 import Data.Maybe
+import Data.Char (isSpace)
 
 import StringUtils
 
@@ -48,6 +49,9 @@ data Expr
   | Def ExprType Name
   | ClosureEnv ExprType Name  -- CallableType (closure type) and struct typename for env
   | DecoratorTarget
+  | DecoratorArg Int
+  | DecoratorArgsAttr Name
+  | DecoratorArgsMethod Expr  -- Call
   | DecoratorDef ExprType Name (CodeBlock Expr)
   | Block (CodeBlock Expr)
   | Call String [Expr]
@@ -94,6 +98,11 @@ instance Pretty e => Pretty (CodeBlock e) where
   prettify exprs = concatMap tabExpr exprs
     where tabExpr e = map ("  " ++) (prettify e)
 
+smartJoin :: [String] -> [String]
+smartJoin strs = if sum (map length strs) < 40
+  then [joinS (map (dropWhile isSpace) strs)]
+  else strs
+
 instance Pretty Expr where
   prettify expr = case expr of
     (TypeCast type_ e) -> joinOrSplit ["(" ++ show type_ ++ ")"] e
@@ -101,8 +110,8 @@ instance Pretty Expr where
     (Float f) -> [joinS ["Float", show f]]
     (Var n) -> [joinS ["Var", show n]]
     (Def t n) -> [joinS ["Def", show t, show n]]
-    (Block es) -> "Block {" : prettify es ++ ["}"]
-    (Call f es) -> (joinS ["Call", show f, "("]) : prettify es ++ [")"]
+    (Block es) -> smartJoin ("Block {" : prettify es ++ ["}"])
+    (Call f es) -> smartJoin (joinS ["Call", show f, "("] : prettify es ++ [")"])
     (Function m t n a r body) ->
         (joinS ["Function", show n, show t, "; args", show a, "; modifiers", show m, "; returns", show r, "{"])
         : prettify body ++ ["}"]
@@ -121,8 +130,8 @@ instance Pretty TypedExpr where
     (tT -> (t, TFloat f)) -> [joinS [t, show f]]
     (tT -> (t, TVar v)) -> [joinS ["Var", t, show v]]
     (tT -> (t, TDef d)) -> [joinS ["Def", t, show d]]
-    (tT -> (t, TBlock es)) -> (joinS ["Block", t, "{"]) : prettify es ++ ["}"]
-    (tT -> (t, TCall f es)) -> (joinS ["Call", t, show f, "("]) : prettify es ++ [")"]
+    (tT -> (t, TBlock es)) -> smartJoin (joinS ["Block", t, "{"] : prettify es ++ ["}"])
+    (tT -> (t, TCall f es)) -> smartJoin (joinS ["Call", t, show f, "("] : prettify es ++ [")"])
     (tT -> (t, TFunction n argN body)) ->
       (joinS ["Function", t, n, show argN, "{"])
       : prettify body ++ ["}"]
